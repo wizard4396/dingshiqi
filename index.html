@@ -1,0 +1,2560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>定时器配置 · 夏日冒险岛</title>
+<style>
+/* ==========================================================================
+   1. 设计 Token —— 飞书风格 / 白底浅色
+   ========================================================================== */
+:root{
+  --bg-page:#FFFFFF;
+  --bg-subtle:#F7F8FA;
+  --bg-hover:#F7F8FA;
+
+  --primary:#3370FF;
+  --primary-hover:#4E7FFF;
+  --primary-active:#2B5FD9;
+  --primary-weak:#E8F0FF;
+
+  --success:#00B42A;
+  --warning:#FF7D00;
+  --danger:#F53F3F;
+  --success-weak:#E8FFEA;
+  --warning-weak:#FFF3E8;
+  --danger-weak:#FFECE8;
+
+  --text-1:#1F2329;
+  --text-2:#646A73;
+  --text-3:#8F959E;
+  --text-4:#C9CDD4;
+
+  --border:#E5E6EB;
+  --border-strong:#DEE0E3;
+  --line:#F2F3F5;
+
+  --radius-s:6px;
+  --radius-m:8px;
+  --radius-l:12px;
+
+  --shadow-modal:0 8px 32px rgba(31,35,41,.12);
+  --shadow-pop:0 4px 16px rgba(31,35,41,.12);
+}
+
+/* ==========================================================================
+   2. Reset / Base
+   ========================================================================== */
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg-page);
+  color:var(--text-1);
+  font:13px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:none;}
+h1{margin:0;}
+[hidden]{display:none !important;}
+
+/* ==========================================================================
+   3. 布局层
+   ========================================================================== */
+.page{max-width:1600px;margin:0 auto;padding:16px 24px 48px;}
+.crumb{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;color:var(--text-3);margin-bottom:14px;
+}
+.crumb b{color:var(--text-2);font-weight:400;}
+.crumb i{font-style:normal;color:var(--text-4);}
+.page-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:24px;
+  padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:18px;
+}
+.page-title{font-size:20px;font-weight:600;line-height:28px;letter-spacing:.2px;}
+.page-sub{margin-top:6px;font-size:13px;color:var(--text-2);}
+.page-sub b{color:var(--text-1);font-weight:500;}
+.page-sub em{font-style:normal;color:var(--text-4);margin:0 6px;}
+.page-acts{display:flex;align-items:center;gap:8px;flex:none;padding-top:4px;}
+
+/* ---- 3.1 顶部导航 ----
+   本期只剩「定时器配置」一项，外壳保留：它是 sticky 顶栏的视觉节奏
+   （删掉会改变整页顶部留白），正式版该模块必然挂在更大的导航里。 */
+.app-nav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;}
+.app-nav__in{
+  max-width:1600px;margin:0 auto;padding:0 24px;height:52px;
+  display:flex;align-items:center;gap:36px;
+}
+.app-nav__brand{font-size:13px;font-weight:600;color:var(--text-1);white-space:nowrap;flex:none;}
+.app-nav__tabs{display:flex;align-items:center;height:100%;}
+.app-nav__item{
+  position:relative;height:100%;padding:0;margin-right:24px;border:0;background:none;
+  font-size:14px;color:var(--text-2);cursor:pointer;transition:.15s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.app-nav__item:hover{color:var(--text-1);}
+.app-nav__item.is-on{color:var(--primary);font-weight:500;}
+.app-nav__item.is-on::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--primary);
+}
+
+/* 卡片 */
+.card{
+  background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;
+}
+.card-hd{
+  height:48px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--line);
+}
+.card-hd__t{font-size:14px;font-weight:600;}
+.card-hd__c{font-size:12px;color:var(--text-3);}
+
+/* ---- 4.11 列表筛选条 ---- */
+/* 静态 DOM：不随 renderTable 重绘 —— 表格每秒可能被扫描触发重绘，
+   条件若放在重绘范围内，用户正在输入的搜索词会被吃掉。
+   控件与操作记录筛选条同一套（fb-input / fb-select）。列表为空时整条收起（见 renderTable）。 */
+.list-filter{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:12px 16px;border-bottom:1px solid var(--line);
+}
+.list-filter__search{position:relative;width:220px;}
+.list-filter__search .fb-input{padding-left:30px;}
+.list-filter__search svg{
+  position:absolute;left:9px;top:50%;margin-top:-6.5px;color:var(--text-3);pointer-events:none;
+}
+
+/* 底部克制的演示入口 */
+.demo-bar{
+  margin-top:14px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;
+  font-size:12px;color:var(--text-3);
+}
+.demo-bar__link{
+  border:0;background:none;padding:0;font-size:12px;color:var(--text-3);cursor:pointer;
+  text-decoration:underline;text-decoration-color:transparent;transition:.15s;
+}
+.demo-bar__link:hover{color:var(--primary);text-decoration-color:currentColor;}
+.demo-bar i{font-style:normal;color:var(--border-strong);}
+.demo-bar__sep{width:1px;height:12px;background:var(--border-strong);margin:0 4px;}
+
+/* GM 快捷入口：一键铺垫覆盖全场景的定时器 */
+.gm-btn{
+  display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;
+  border:1px solid var(--border-strong);border-radius:var(--radius-s);
+  background:#fff;color:var(--text-2);font-size:12px;cursor:pointer;transition:.15s;
+}
+.gm-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-weak);}
+.gm-btn:active{background:#DCE7FF;}
+.gm-btn__tag{
+  display:inline-flex;align-items:center;height:14px;padding:0 4px;border-radius:3px;
+  background:var(--primary-weak);color:var(--primary);
+  font-size:10px;font-weight:700;letter-spacing:.5px;line-height:1;
+}
+.gm-btn:hover .gm-btn__tag{background:#fff;}
+
+/* ==========================================================================
+   4. 组件层
+   ========================================================================== */
+
+/* ---- 4.1 按钮 ---- */
+.fb-btn{
+  height:32px;padding:0 16px;border-radius:var(--radius-m);
+  border:1px solid var(--border-strong);background:#fff;color:var(--text-1);
+  font-size:13px;font-weight:400;cursor:pointer;transition:.15s;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;
+}
+.fb-btn:hover{background:var(--bg-subtle);border-color:var(--text-4);}
+.fb-btn:active{background:var(--line);}
+.fb-btn--primary{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:500;}
+.fb-btn--primary:hover{background:var(--primary-hover);border-color:var(--primary-hover);}
+.fb-btn--primary:active{background:var(--primary-active);border-color:var(--primary-active);}
+.fb-btn:disabled{background:var(--bg-subtle);border-color:var(--border);color:var(--text-3);cursor:not-allowed;}
+.fb-btn--primary:disabled{background:var(--primary);border-color:var(--primary);color:#fff;opacity:.5;cursor:not-allowed;}
+.fb-btn--danger{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:500;}
+.fb-btn--danger:hover{background:#FF6B6B;border-color:#FF6B6B;}
+.fb-btn--danger:active{background:#D93026;border-color:#D93026;}
+
+/* 文字按钮 */
+.fb-link{
+  border:0;background:none;padding:0;font-size:13px;color:var(--primary);
+  cursor:pointer;transition:.15s;line-height:1.4;
+}
+.fb-link:hover{color:var(--primary-hover);text-decoration:underline;}
+.fb-link--danger{color:var(--danger);}
+.fb-link--danger:hover{color:#FF6B6B;}
+
+/* ---- 4.2 输入 / 下拉 / 日期 ---- */
+.fb-input,.fb-select{
+  height:32px;padding:0 10px;border:1px solid var(--border-strong);border-radius:var(--radius-m);
+  background:#fff;color:var(--text-1);font-size:13px;font-family:inherit;
+  transition:border-color .15s,box-shadow .15s;outline:none;
+}
+.fb-input{width:100%;}
+.fb-input::placeholder{color:var(--text-4);}
+.fb-input:hover,.fb-select:hover{border-color:var(--text-4);}
+.fb-input:focus,.fb-select:focus{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-weak);}
+.fb-input:disabled,.fb-select:disabled{background:var(--bg-subtle);color:var(--text-3);cursor:not-allowed;}
+.fb-select{
+  width:auto;padding-right:26px;cursor:pointer;appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238F959E' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;
+}
+input[type="date"].fb-input{padding-right:8px;}
+input[type="date"].fb-input::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.55;}
+input[type="date"].fb-input::-webkit-calendar-picker-indicator:hover{opacity:.9;}
+
+/* ---- 4.3 段控（飞书 Tab 风） ---- */
+.fb-seg{
+  display:inline-flex;align-items:center;gap:2px;padding:2px;
+  background:var(--bg-subtle);border-radius:var(--radius-m);
+}
+.fb-seg__item{
+  height:26px;padding:0 12px;border:0;background:transparent;border-radius:var(--radius-s);
+  font-size:13px;color:var(--text-2);cursor:pointer;transition:.15s;white-space:nowrap;
+}
+.fb-seg__item:hover{color:var(--text-1);}
+.fb-seg__item.is-on{background:#fff;color:var(--primary);font-weight:500;box-shadow:0 1px 2px rgba(31,35,41,.08);}
+.fb-seg__item:disabled{color:var(--text-4);cursor:not-allowed;}
+
+/* ---- 4.4 多选标签 ---- */
+.fb-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.fb-tag{
+  height:26px;padding:0 11px;border:1px solid var(--border-strong);background:#fff;
+  border-radius:var(--radius-s);font-size:12px;color:var(--text-2);cursor:pointer;transition:.12s;
+}
+.fb-tag:hover{border-color:var(--primary);color:var(--primary);}
+.fb-tag.is-on{background:var(--primary-weak);border-color:var(--primary);color:var(--primary);font-weight:500;}
+.fb-tag--num{width:34px;padding:0;display:inline-flex;align-items:center;justify-content:center;}
+
+/* ---- 4.4b 单选圆点（生效区间的「始终生效 / 固定期限内生效」） ----
+   用原生 radio：键盘可达、屏幕阅读器可读，样式只补颜色与焦点环。
+   accent-color 让圆点跟随主色，不自己画一套假圆点（假圆点会丢掉键盘与无障碍语义）。 */
+.fb-radios{display:flex;flex-direction:column;gap:8px;}
+.fb-radio{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:13px;color:var(--text-1);cursor:pointer;user-select:none;
+}
+.fb-radio input[type="radio"]{
+  width:14px;height:14px;margin:0;flex:none;
+  accent-color:var(--primary);cursor:pointer;
+}
+.fb-radio input[type="radio"]:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
+.fb-radio:hover{color:var(--primary);}
+/* 选中「固定期限内生效」后原位展开的日期框：与上一行的单选组留出间距 */
+.fb-radios+.inline{margin-top:10px;}
+
+/* ---- 4.5 定时器状态（按周期：真开关，点了走二次确认；单次执行：只读） ---- */
+.fb-status{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.fb-status__dot{width:6px;height:6px;border-radius:50%;flex:none;background:currentColor;}
+.fb-status__txt{font-size:12px;}
+.fb-status--enabled .fb-status__txt{color:var(--success);}
+.fb-status--disabled .fb-status__txt{color:var(--danger);}
+.fb-status--executed .fb-status__txt{color:var(--warning);}
+/* 可启停：真开关（轨道 + 滑块）+ 文字。开关只表达「现在是启用还是禁用」，
+   点它**不直接翻转** —— 打开的是二次确认弹窗（见 toggleTimer）。
+   状态色沿用 fb-status--enabled / disabled，**不另起一套 is-on 类**：
+   于是滑块与文字永远同源，不会出现「滑块是绿的、文字写着禁用」。
+   同列的只读状态没有轨道，一眼就能区分「能点的」和「只能看的」。 */
+.fb-switch{
+  display:inline-flex;align-items:center;gap:6px;
+  border:0;background:none;padding:0;cursor:pointer;white-space:nowrap;
+}
+.fb-switch__track{
+  position:relative;flex:none;width:28px;height:16px;border-radius:8px;
+  background:var(--text-4);transition:background .15s;
+}
+.fb-switch__thumb{
+  position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 2px rgba(31,35,41,.2);transition:transform .15s;
+}
+.fb-switch.fb-status--enabled .fb-switch__track{background:var(--success);}
+.fb-switch.fb-status--enabled .fb-switch__thumb{transform:translateX(12px);}
+.fb-switch:hover .fb-switch__track{filter:brightness(.94);}
+.fb-switch:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:4px;}
+
+/* ---- 4.5b 「定时器状态」列头的悬浮说明（ⓘ 触发 + 气泡）----
+   ★ 气泡必须 position:fixed ★ —— 表格容器 .table-wrap 是 overflow-x:auto，
+   而「一个轴非 visible、另一个轴 visible 会计算成 auto」是 CSS 的硬规则，
+   于是 overflow-y 也成了 auto：普通绝对定位的浮层会被表格容器裁掉。
+   fixed 元素的包含块是视口、不受祖先 overflow 裁剪，才放得下。
+   代价是矩形要 JS 现算（见 showThTip），且滚动 / 缩放后会与 ⓘ 脱节 → 直接收起。 */
+.th-info{
+  display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;
+  width:14px;height:14px;margin-left:5px;padding:0;border:0;border-radius:50%;
+  background:none;color:var(--text-4);cursor:help;
+}
+.th-info:hover,.th-info:focus-visible{color:var(--primary);}
+.th-info svg{display:block;}
+.th-tip{
+  position:fixed;z-index:220;max-width:440px;padding:9px 11px;   /* 440 是为了让两条说明各占一行：第 2 条 33 字（约 396px），380 会折成三行 */
+  background:#fff;border:1px solid var(--border);border-radius:var(--radius-m);
+  box-shadow:var(--shadow-pop);font-size:12px;line-height:1.75;color:var(--text-2);
+  pointer-events:none;   /* 不挡鼠标，否则移向气泡会触发 ⓘ 的 mouseout */
+}
+.th-tip b{color:var(--text-1);font-weight:600;}
+
+/* ---- 4.6 状态徽标 ---- */
+.fb-badge{
+  display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;
+  font-size:12px;line-height:1;white-space:nowrap;
+}
+.badge-blue{background:var(--primary-weak);color:var(--primary);}
+.badge-orange{background:var(--warning-weak);color:var(--warning);}
+.badge-gray{background:var(--line);color:var(--text-2);}
+.badge-green{background:var(--success-weak);color:var(--success);}
+.badge-red{background:var(--danger-weak);color:var(--danger);}
+
+/* ---- 4.7 表格 ---- */
+.table-wrap{overflow-x:auto;}
+.fb-table{width:100%;min-width:1212px;border-collapse:separate;border-spacing:0;}
+.fb-table thead th{
+  height:40px;padding:0 12px;background:var(--bg-subtle);
+  font-size:12px;font-weight:500;color:var(--text-2);text-align:left;white-space:nowrap;
+  border-bottom:1px solid var(--border);
+}
+.fb-table tbody td{
+  height:48px;padding:8px 12px;border-bottom:1px solid var(--line);
+  font-size:13px;color:var(--text-1);vertical-align:middle;
+}
+.fb-table tbody tr:hover td{background:var(--bg-hover);}
+.fb-table tbody tr:last-child td{border-bottom:0;}
+.td-id{color:var(--text-2);font-variant-numeric:tabular-nums;}
+.td-key,.td-val{
+  font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  font-size:12.5px;word-break:break-all;
+}
+.td-detail{color:var(--text-1);}
+.td-range{color:var(--text-2);font-variant-numeric:tabular-nums;font-size:12.5px;}
+.muted{color:var(--text-4);}
+.th-ops,.td-ops{
+  position:sticky;right:0;background:#fff;z-index:1;
+  box-shadow:-6px 0 8px -6px rgba(31,35,41,.1);white-space:nowrap;
+}
+.fb-table thead th.th-ops{background:var(--bg-subtle);z-index:3;}
+.fb-table tbody tr:hover td.td-ops{background:var(--bg-hover);}
+.td-ops .fb-link+.fb-link{margin-left:14px;}
+/* ---- 4.7b 生效前确认弹窗：左右对比表（.detail__meta / .cmp-table 全套复用） ---- */
+.detail__meta{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.detail__id{font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums;}
+.cmp-table{
+  width:100%;border-collapse:separate;border-spacing:0;font-size:13px;
+  border:1px solid var(--border);border-radius:var(--radius-m);overflow:hidden;
+}
+.cmp-table th{
+  height:38px;padding:0 12px;background:var(--bg-subtle);text-align:left;
+  font-size:12px;font-weight:500;color:var(--text-2);border-bottom:1px solid var(--border);
+}
+.cmp-table td{
+  padding:10px 12px;border-bottom:1px solid var(--line);
+  color:var(--text-1);vertical-align:top;word-break:break-all;
+}
+.cmp-table tr:last-child td{border-bottom:0;}
+.cmp-table th+th,.cmp-table td+td{border-left:1px solid var(--line);}
+.cmp-table__k{width:104px;color:var(--text-2);background:var(--bg-subtle);font-size:12px;}
+/* 与左列不同 → 右侧橙色高亮，左列灰化压暗 */
+.cmp-table td.is-changed{background:var(--warning-weak);color:#D96500;font-weight:500;}
+.cmp-table td.is-was{color:var(--text-3);}
+.cmp-empty{color:var(--text-4);}
+/* 注意：这两个修饰符写在 .alert 之前，必须多带一个类提优先级，
+   否则同等优先级下会被后面的 .alert 整体覆盖（曾踩过这个坑） */
+.alert.alert--danger{background:var(--danger-weak);color:var(--text-1);}
+.alert.alert--warn{background:var(--warning-weak);color:var(--text-1);}
+.alert--danger b{color:var(--danger);}
+.alert--warn b{color:var(--warning);}
+
+/* ---- 4.8 空态 ---- */
+.empty{padding:76px 20px;text-align:center;color:var(--text-3);font-size:13px;}
+.empty svg{display:block;margin:0 auto 14px;}
+
+/* ---- 4.9 弹窗 ---- */
+.mask{
+  position:fixed;inset:0;z-index:100;background:rgba(31,35,41,.45);
+  display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px 24px;
+}
+/* 确认弹窗叠在配置弹窗之上：100（.mask）< 150 < 200（toast） */
+.mask--top{z-index:150;}
+.modal{
+  width:640px;max-width:100%;max-height:88vh;background:#fff;border-radius:var(--radius-l);
+  box-shadow:var(--shadow-modal);display:flex;flex-direction:column;overflow:hidden;
+  animation:modalIn .18s ease-out;
+}
+@keyframes modalIn{from{opacity:0;transform:translateY(-10px) scale(.985);}to{opacity:1;transform:none;}}
+.modal__hd{
+  height:56px;padding:0 20px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--line);
+}
+.modal__title{font-size:16px;font-weight:600;}
+.modal__x{
+  width:28px;height:28px;border:0;background:none;border-radius:var(--radius-s);
+  color:var(--text-3);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:.15s;
+}
+.modal__x:hover{background:var(--bg-subtle);color:var(--text-1);}
+.modal__bd{padding:18px 20px 4px;overflow-y:auto;flex:1 1 auto;}
+.modal__ft{
+  height:64px;padding:0 20px;flex:none;display:flex;align-items:center;justify-content:flex-end;gap:8px;
+  border-top:1px solid var(--line);
+}
+
+/* ---- 4.9b 操作记录弹窗（表格更宽，需要更大的容器） ---- */
+.modal--lg{width:1060px;}
+/* ---- 4.9c 生效前确认弹窗（左右对比表，容器略窄） ---- */
+.modal--md{width:800px;}
+
+/* ---- 4.9d 操作记录弹窗 ---- */
+#maskLog .modal__bd{padding:16px 20px 20px;}
+#maskLog .empty{padding:52px 20px;}
+.log-filter{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+/* 操作记录弹窗是 1060px、左右内边距各 20px → 可用宽度恰好 1020px。
+   5 列固定宽合计 100+220+160+140+100 = 720px，min-width 取 720px 即可；
+   表格 width:100% 会把余下 300px 按比例摊给各列，不撑出横向滚动 ——
+   要加列或改列宽前，先回来看一眼这个数字（可用宽度仍是 1020px）。 */
+.fb-table--log{min-width:720px;}
+.td-time{white-space:nowrap;color:var(--text-2);font-variant-numeric:tabular-nums;}
+.td-actor{color:var(--text-2);white-space:nowrap;}
+.td-actor--system{color:var(--text-3);}   /* 预留：系统动作分支，本次不产出条目 */
+
+/* ---- 4.10 表单字段 ---- */
+.field{margin-bottom:16px;}
+.field__label{font-size:13px;font-weight:500;color:var(--text-1);margin-bottom:8px;}
+.field__label .req{color:var(--danger);margin-left:2px;}
+.field__hint{margin-top:6px;font-size:12px;color:var(--text-3);line-height:1.6;}
+.field__err{display:none;margin-top:6px;font-size:12px;color:var(--danger);}
+.field.is-error>.field__err{display:block;}
+.field.is-error .fb-input,.field.is-error .fb-select{border-color:var(--danger);}
+.field.is-error .fb-input:focus,.field.is-error .fb-select:focus{box-shadow:0 0 0 2px var(--danger-weak);}
+.field.is-error .fb-seg{box-shadow:0 0 0 1px var(--danger);}
+.field.is-error .fb-tags{outline:1px solid var(--danger);outline-offset:4px;border-radius:var(--radius-s);}
+
+.inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.sep{color:var(--text-3);font-size:13px;}
+.txt{font-size:13px;color:var(--text-2);}
+.dow{font-size:12px;color:var(--text-3);}
+
+/* ---- 4.11 预览 / 说明条 ---- */
+.preview{
+  display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;
+  padding:10px 12px;background:var(--primary-weak);border-radius:var(--radius-m);font-size:13px;
+}
+.preview__k{color:var(--text-2);flex:none;font-size:12px;}
+.preview__v{color:var(--primary);font-weight:600;word-break:break-all;}
+.alert{
+  margin:14px 0 16px;padding:10px 12px;background:var(--bg-subtle);border-radius:var(--radius-m);
+  font-size:12px;color:var(--text-3);line-height:1.7;
+}
+
+/* ---- 4.12 顶部轻提示 ---- */
+#toastBox{
+  position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:200;
+  display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;
+}
+.fb-toast{
+  display:flex;align-items:center;gap:8px;max-width:600px;
+  padding:9px 14px;background:#fff;border:1px solid var(--border);border-radius:var(--radius-m);
+  font-size:13px;color:var(--text-1);box-shadow:var(--shadow-pop);
+  animation:toastIn .2s ease-out;
+}
+.fb-toast.is-out{animation:toastOut .2s ease-in forwards;}
+.fb-toast__dot{width:6px;height:6px;border-radius:50%;flex:none;}
+.fb-toast--error .fb-toast__dot{background:var(--danger);}
+.fb-toast--success .fb-toast__dot{background:var(--success);}
+@keyframes toastIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-8px);}}
+
+/* ==========================================================================
+   5. 工具类（放在最后以覆盖组件默认宽度）
+   ========================================================================== */
+.w-64{width:64px;}
+.w-80{width:80px;}
+.w-96{width:96px;}
+.w-120{width:120px;}
+.w-160{width:160px;}
+</style>
+</head>
+<body>
+
+<!-- 顶部导航：本期只有「定时器配置」一项（外壳保留，理由见上方 3.1） -->
+<nav class="app-nav">
+  <div class="app-nav__in">
+    <div class="app-nav__brand">工坊玩法 · 全服存档</div>
+    <div class="app-nav__tabs">
+      <button type="button" class="app-nav__item is-on" id="navConfig">定时器配置</button>
+    </div>
+  </div>
+</nav>
+
+<div class="page" id="viewConfig">
+
+  <!-- 面包屑 -->
+  <div class="crumb">
+    <b>工坊玩法</b><i>/</i><b>全服存档</b><i>/</i><span>定时器配置</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">定时器配置</h1>
+      <div class="page-sub">
+        当前项目：<b>夏日冒险岛</b><em>·</em>定时器触发时，将 Key / Value 写入该项目全服存档
+      </div>
+    </div>
+    <div class="page-acts">
+      <button type="button" class="fb-btn" id="btnLog" title="查看操作记录">操作记录</button>
+      <button type="button" class="fb-btn fb-btn--primary" id="btnAdd">新增定时器</button>
+    </div>
+  </div>
+
+  <!-- 列表卡片 -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-hd__t">定时器列表</div>
+      <div class="card-hd__c" id="listCount">共 0 条</div>
+    </div>
+    <!-- 列表筛选：Key 搜索 + 两个下拉，静态 DOM（不随表格重绘）。
+         「定时器状态」按列上实际出现的四种文案筛（启用 / 禁用 / 待执行 / 已执行）——
+         单次执行没有启用 / 禁用语义，只给两项的话，选「启用」会把它们全漏掉。
+         列表为空时整条收起（见 renderTable）。 -->
+    <div class="list-filter" id="listFilter">
+      <div class="list-filter__search">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input type="text" class="fb-input" id="fKeySearch" maxlength="64"
+               placeholder="搜索 Key" autocomplete="off">
+      </div>
+      <select class="fb-select w-120" id="fFreq" aria-label="按执行频率筛选">
+        <option value="">全部执行频率</option>
+        <option value="cycle">按周期</option>
+        <option value="once">单次执行</option>
+      </select>
+      <select class="fb-select w-120" id="fStatus" aria-label="按定时器状态筛选">
+        <option value="">全部定时器状态</option>
+        <option value="enabled">启用</option>
+        <option value="disabled">禁用</option>
+        <option value="pending">待执行</option>
+        <option value="executed">已执行</option>
+      </select>
+      <button type="button" class="fb-btn" id="fReset" hidden>重置</button>
+    </div>
+    <div id="tableRegion"></div>
+  </div>
+
+  <!-- 演示入口（克制、不抢戏） -->
+  <div class="demo-bar">
+    <button type="button" class="gm-btn" id="demoGm"
+            title="一键追加覆盖全部执行频率、周期粒度与状态的定时器">
+      <span class="gm-btn__tag">GM</span>
+      <span>一键铺满全场景</span>
+    </button>
+    <span class="demo-bar__sep"></span>
+    <span>演示：</span>
+    <button type="button" class="demo-bar__link" id="demoLoad">载入演示数据</button>
+    <i>·</i>
+    <button type="button" class="demo-bar__link" id="demoClear">清空</button>
+    <i>·</i>
+    <button type="button" class="demo-bar__link" id="demoFastForward">时间快进 +1 天</button>
+  </div>
+
+</div>
+<!-- 配置弹窗 -->
+<div class="mask" id="mask" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal__hd">
+      <div class="modal__title" id="modalTitle">新增定时器</div>
+      <button type="button" class="modal__x" data-close="1" aria-label="关闭">✕</button>
+    </div>
+
+    <div class="modal__bd">
+      <div class="field" id="f-key">
+        <div class="field__label">Key<span class="req">*</span></div>
+        <input type="text" class="fb-input" id="in-key" maxlength="64" placeholder="请输入 Key" autocomplete="off">
+        <div class="field__hint">Key可自由输入，无格式限制。</div>
+        <div class="field__err"></div>
+      </div>
+
+      <div class="field" id="f-value">
+        <div class="field__label">Value<span class="req">*</span></div>
+        <input type="text" class="fb-input" id="in-value" inputmode="decimal" placeholder="请输入 Value" autocomplete="off">
+        <div class="field__hint">Value仅允许数字（支持负数、小数点）</div>
+        <div class="field__err"></div>
+      </div>
+
+      <!-- 这里不提供「定时器状态」：新建一律「启用」，改状态唯一入口是列表上的状态开关。
+           一份配置只允许有一个取法 —— 状态若两处可改，就会出现「弹窗里选了禁用、列表上又点回启用」
+           这种两个入口互相覆盖的情形。 -->
+
+      <div class="field" id="f-freq">
+        <div class="field__label">执行频率<span class="req">*</span></div>
+        <div class="fb-seg" id="segFreq">
+          <button type="button" class="fb-seg__item" data-freq="cycle">按周期</button>
+          <button type="button" class="fb-seg__item" data-freq="once">单次执行</button>
+        </div>
+      </div>
+
+      <!-- 动态区域：按执行频率 / 周期粒度整体重绘 -->
+      <div id="dynamicArea"></div>
+
+      <!-- 生效日期区间（独立字段，单次执行时整行隐藏）
+           按周期下由单选项决定：始终生效（默认）/ 固定期限内生效（选中才原位展开日期框）。
+           切回「始终生效」会清空两个日期 —— 于是「日期为空 ⟺ 始终生效」恒成立，
+           记录侧不需要再存一个模式字段（一份配置只允许有一个取法）。 -->
+      <div class="field" id="f-range">
+        <div class="field__label">生效日期区间</div>
+        <div class="fb-radios" id="rangeModes">
+          <label class="fb-radio">
+            <input type="radio" name="rangeMode" value="always" checked>
+            <span>始终生效</span>
+          </label>
+          <label class="fb-radio">
+            <input type="radio" name="rangeMode" value="fixed">
+            <span>固定期限内生效</span>
+          </label>
+        </div>
+        <div class="inline" id="rangePicker" hidden>
+          <input type="date" class="fb-input w-160" id="in-rstart">
+          <span class="sep">~</span>
+          <input type="date" class="fb-input w-160" id="in-rend">
+        </div>
+        <div class="field__hint">选「固定期限内生效」时，仅在所选区间内触发；区间外的时间点跳过。</div>
+        <div class="field__err"></div>
+      </div>
+
+      <div class="preview">
+        <span class="preview__k">执行详情预览：</span>
+        <span class="preview__v" id="previewText">—</span>
+      </div>
+
+      <!-- 说明条只在「编辑一条『已执行』的单次执行」时出现（橙色，提示这是重新排期）。
+           新增 / 一般编辑不再有说明条 —— 「确认后会怎样」统一由生效前确认弹窗交代，
+           同一件事只说一遍。非重新排期时靠 hidden 收起，不留空盒子。 -->
+      <div class="alert alert--warn" id="formAlert" hidden></div>
+    </div>
+
+    <div class="modal__ft">
+      <button type="button" class="fb-btn" data-close="1">取消</button>
+      <button type="button" class="fb-btn fb-btn--primary" id="btnSave">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 操作记录弹窗（全局入口，按时间倒序） -->
+<div class="mask" id="maskLog" hidden>
+  <div class="modal modal--lg" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+    <div class="modal__hd">
+      <div class="modal__title" id="logTitle">操作记录</div>
+      <button type="button" class="modal__x" data-close-log="1" aria-label="关闭">✕</button>
+    </div>
+
+    <div class="modal__bd">
+      <!-- 筛选只剩操作类型一个维度：Key 搜索随「操作详情」列一起去掉 ——
+           列表里不再展示 Key，搜出来了也看不见，留着只会「对不上号」。 -->
+      <div class="log-filter">
+        <select class="fb-select w-120" id="logAction">
+          <option value="">全部操作类型</option>
+          <option value="add">新增</option>
+          <option value="edit">修改</option>
+          <option value="delete">删除</option>
+          <option value="enable">启用</option>
+          <option value="disable">禁用</option>
+        </select>
+      </div>
+      <div id="logRegion"></div>
+    </div>
+
+    <div class="modal__ft">
+      <button type="button" class="fb-btn fb-btn--primary" data-close-log="1">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     生效前确认（左右对比）
+     —— 新增 / 修改 / 删除共用；叠在配置弹窗之上（.mask--top），
+        取消只关这一层，下面的编辑内容与表单值原样保留
+     ========================================================================== -->
+<div class="mask mask--top" id="maskConfirm" hidden>
+  <div class="modal modal--md" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="modal__hd">
+      <div class="modal__title" id="confirmTitle">确认生效</div>
+      <button type="button" class="modal__x" data-close-confirm="1" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal__bd" id="confirmBody"></div>
+    <div class="modal__ft">
+      <button type="button" class="fb-btn" data-close-confirm="1">取消</button>
+      <button type="button" class="fb-btn fb-btn--primary" id="btnConfirmOk">确认生效</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     操作详情（只读）
+     —— 从操作记录弹窗内的「查看详情」逐行打开，展示该次动作的配置前后对比。
+        与「生效前确认」共用同一套渲染（.detail__meta + .cmp-table + 差异高亮），
+        区别只在于：这里是只读的，底部只有一个「关闭」，也没有那一句动作提示。
+        用 .mask--top 叠在操作记录弹窗（.mask，z=100）之上。
+     ========================================================================== -->
+<div class="mask mask--top" id="maskLogView" hidden>
+  <div class="modal modal--md" role="dialog" aria-modal="true" aria-labelledby="logViewTitle">
+    <div class="modal__hd">
+      <div class="modal__title" id="logViewTitle">操作详情</div>
+      <button type="button" class="modal__x" data-close-logview="1" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal__bd" id="logViewBody"></div>
+    <div class="modal__ft">
+      <button type="button" class="fb-btn fb-btn--primary" data-close-logview="1" id="btnLogViewClose">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastBox"></div>
+
+<!-- ==========================================================================
+     「定时器状态」列头的悬浮说明
+     —— 挂在 body 下、position:fixed（见 4.5b）：气泡若放进表格，会被 .table-wrap 裁掉。
+        内容静态，JS 只负责显示 / 隐藏与按 ⓘ 的位置摆放。
+     ========================================================================== -->
+<div class="th-tip" id="thStatusTip" role="tooltip" hidden><b>按周期</b>：可在此列切换定时器开关，决定启用还是禁用<br><b>单次执行</b>：默认开启状态，只展示定时器执行进度（待执行 / 已执行）</div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   1. 常量
+   ========================================================================== */
+const WD = ["周一","周二","周三","周四","周五","周六","周日"];
+
+/* 执行频率：本期只做「按周期」与「单次执行」——「按间隔」暂不提供（见需求案待定项） */
+const FREQ_LABEL = { cycle:"按周期", once:"单次执行" };
+/* 周期粒度：本期不做「双周」（见需求案待定项） */
+const GRAN_LABEL = { daily:"每天", weekly:"每周", monthly:"每月", yearly:"每年" };
+const GRAN_ORDER = ["daily","weekly","monthly","yearly"];
+
+/* 操作记录里的动作（5 种，与列表上能做的操作一一对应）。
+   启停拆成「启用 / 禁用」两枚：日志正文里唯一的动作描述就是这一列，
+   笼统写「启停」看不出这次到底是开还是关（原先由已删除的详情文案承担）。
+   两者同色 —— 同属「运行态变更」，靠文字区分即可。 */
+const LOG_ACTION = {
+  add    : { label:"新增", cls:"badge-green"  },
+  edit   : { label:"修改", cls:"badge-orange" },
+  delete : { label:"删除", cls:"badge-red"    },
+  enable : { label:"启用", cls:"badge-blue"   },
+  disable: { label:"禁用", cls:"badge-blue"   }
+};
+
+/* 定时器状态的四个**展示态** —— 列表「定时器状态」列与筛选下拉的唯一口径：
+   按周期 → 启用 / 禁用；单次执行 → 待执行 / 已执行。
+   注意展示态的 key 与存储字段**不同名**：单次执行的「待执行」在记录里仍是 timerStatus:"enabled"
+   （兜底值）。若直接拿存储值去筛「启用」，这些记录会被误命中 —— 所以一律先经 statusKeyOf()
+   归一到展示态。统一从这一个出口取，列表、筛选、确认弹窗才不会各写一套。 */
+const STATUS_VIEW = {
+  enabled : { label:"启用",   cls:"fb-status--enabled"  },
+  disabled: { label:"禁用",   cls:"fb-status--disabled" },
+  pending : { label:"待执行", cls:"fb-status--enabled"  },
+  executed: { label:"已执行", cls:"fb-status--executed" }
+};
+
+/* 记录 → 展示态 key（enabled / disabled / pending / executed）。 */
+function statusKeyOf(r){
+  if (r.freq === "once") return r.timerStatus === "executed" ? "executed" : "pending";
+  return r.timerStatus === "disabled" ? "disabled" : "enabled";
+}
+
+/* 展示态 → { label, cls }。入参保留 (freq, status) 形态，兼容只拿到这两个字段的调用点。 */
+function statusLabelOf(freq, status){
+  return STATUS_VIEW[statusKeyOf({ freq: freq, timerStatus: status })];
+}
+
+/* 错误文案 → 字段容器的映射 */
+const ERR_FIELD_ID = {
+  key          : "f-key",
+  value        : "f-value",
+  cycleWeek    : "f-cycleWeek",
+  cycleMonth   : "f-cycleMonth",
+  cycleYear    : "f-cycleYear",
+  time         : "f-time",
+  onceDate     : "f-onceDate",
+  range        : "f-range"
+};
+
+/* ==========================================================================
+   2. 工具函数
+   ========================================================================== */
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
+
+const pad2 = n => String(n).padStart(2, "0");
+
+/* 时间格式：小时与分钟均补两位（05:00、13:05）—— 全站唯一出口，口径要改只动这一行 */
+const fmtTime = (h, m) => pad2(h) + ":" + pad2(m);
+
+const clone = o => (o == null ? null : JSON.parse(JSON.stringify(o)));
+
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+  { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]
+));
+
+/* "YYYY-MM-DD" → 周几（周一为起点） */
+function dowOf(dateStr){
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return "";
+  return WD[(d.getDay() + 6) % 7];
+}
+
+const isNum = v => v !== null && v !== "" && v !== undefined && !isNaN(Number(v));
+
+/* 只保留"必须有值"的判定，避免大量 isNum(null) 之类的噪音 */
+const hasNum = v => typeof v === "number" && !isNaN(v);
+
+/* ==========================================================================
+   3. 执行详情文案生成（严格按需求第六节）
+   ========================================================================== */
+function buildScheduleText(c){
+  if (!c) return "—";
+
+  if (c.freq === "cycle") {
+    const g = c.cycle || {};
+    if (!hasNum(g.hour) || !hasNum(g.minute)) return "—";
+    const t = fmtTime(g.hour, g.minute);
+
+    switch (g.granularity) {
+      case "daily":
+        return "每天 " + t;
+
+      case "weekly": {
+        const list = (g.weekdays || []).slice().sort((a, b) => a - b);
+        if (!list.length) return "—";
+        return "每" + list.map(i => WD[i - 1]).join("、") + " " + t;
+      }
+
+      case "monthly": {
+        const list = (g.monthDays || []).slice().sort((a, b) => a - b);
+        if (!list.length) return "—";
+        return "每月 " + list.map(d => d + "日").join("、") + " " + t;
+      }
+
+      case "yearly":
+        if (!hasNum(g.yearMonth) || !hasNum(g.yearDay)) return "—";
+        return "每年 " + g.yearMonth + "月" + g.yearDay + "日 " + t;
+
+      default:
+        return "—";
+    }
+  }
+
+  if (c.freq === "once") {
+    const o = c.once || {};
+    if (!o.date || !hasNum(o.hour) || !hasNum(o.minute)) return "—";
+    const w = dowOf(o.date);
+    return o.date + (w ? " " + w : "") + " " + fmtTime(o.hour, o.minute);
+  }
+
+  return "—";
+}
+
+/* ==========================================================================
+   4. 状态
+   ========================================================================== */
+const state = {
+  list: [],          // 定时器列表（按 createdAt 倒序展示）
+  nextId: 1,
+  editingId: null,   // null = 新增
+  form: null,
+  errors: {},
+  reschedule: false, // 本次编辑是否为「已执行」定时器的重新排期
+  logs: []           // 操作记录（只追加，不随定时器删除而级联删除）
+};
+
+/* 确认弹窗的上下文：{ action:"add"|"edit"|"delete", id, right, left }
+   左右两侧都存纯数据副本，弹窗开着期间不再读 state —— 否则到点扫描改了记录，
+   左右两列会当着用户的面漂移。属于「弹窗的临时状态」，不进 state。 */
+let confirmCtx = null;
+
+/* ---- 操作记录 ----------------------------------------------------------
+   日志 = 配置的变更史。保存即生效，所以「改动生效配置」与「点下按钮」是同一时刻，
+   凡是真的改动了配置的动作都在动作完成的那一刻写一条：新增 / 修改 / 删除 / 启停。
+   校验未过、无改动的保存、取消确认 —— 都不写。 */
+let logSeq = 0;                       // 单调递增，用于同毫秒排序稳定
+const MAX_LOG = 500;                  // 原型里做个上限，避免长时间演示无限增长
+const OPERATOR = "运营同学";            // 原型无登录态，固定操作人
+
+/* ---- 模拟时钟 ----------------------------------------------------------
+   偏移为 0 时等价于真实时间；GM 的「时间快进」按钮累加偏移。
+   只有「执行时刻」相关的判定走这个时钟，记录的 createdAt 仍用真实时间。 */
+let CLOCK_OFFSET = 0;
+const nowTs = () => Date.now() + CLOCK_OFFSET;
+
+/* jsdom 下不挂心跳（否则 node 进程不退出）；测试改为手动调 scanOnce / advanceClock */
+const IS_TEST_ENV = (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent || ""));
+
+/* ==========================================================================
+   5. Toast
+   ========================================================================== */
+function toast(msg, type){
+  const box = $("#toastBox");
+
+  /* 最多同时保留 3 条，超出时丢掉最旧的，避免堆叠过高盖住内容 */
+  while (box.children.length >= 3) box.removeChild(box.firstElementChild);
+
+  const el = document.createElement("div");
+  el.className = "fb-toast fb-toast--" + (type || "error");
+  el.innerHTML = '<span class="fb-toast__dot"></span><span>' + esc(msg) + "</span>";
+  box.appendChild(el);
+  setTimeout(() => {
+    el.classList.add("is-out");
+    setTimeout(() => el.remove(), 220);
+  }, 3000);
+}
+
+/* ==========================================================================
+   6. 列表渲染
+   ========================================================================== */
+const EMPTY_SVG = ''
+  + '<svg width="72" height="56" viewBox="0 0 72 56" fill="none" xmlns="http://www.w3.org/2000/svg">'
+  + '<rect x="2" y="10" width="60" height="42" rx="7" stroke="#C9CDD4" stroke-width="1.6" stroke-dasharray="5 4"/>'
+  + '<rect x="12" y="20" width="30" height="4" rx="2" fill="#E5E6EB"/>'
+  + '<rect x="12" y="30" width="40" height="4" rx="2" fill="#E5E6EB"/>'
+  + '<rect x="12" y="40" width="22" height="4" rx="2" fill="#E5E6EB"/>'
+  + '<circle cx="52" cy="18" r="13" fill="#fff" stroke="#C9CDD4" stroke-width="1.6"/>'
+  + '<path d="M52 11.5V18l4.5 3" stroke="#C9CDD4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+  + '</svg>';
+
+/* 列表展示用日期格式：2026-09-01 → 2026/09/01（存储仍用 YYYY-MM-DD） */
+const fmtDate = s => String(s).replace(/-/g, "/");
+
+/* 操作记录的时间出口：YYYY/MM/DD HH:mm:ss
+   刻意用真实墙钟（不叠加 CLOCK_OFFSET）—— demoGm / demoLoad / demoClear 都会把
+   模拟时钟偏移归零，若叠加偏移，快进期间写入的时间戳偏大、重置后写入的偏小，倒序会乱。 */
+function fmtDateTime(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + "/" + pad2(d.getMonth() + 1) + "/" + pad2(d.getDate())
+       + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+}
+
+/* 生效区间的纯文本口径 —— 列表与详情对比表共用这一个出口 */
+function plainRange(r){
+  /* 单次执行本身即一次性时点：不适用区间，但给一句形态文案（与「始终生效」同为灰字） */
+  if (r.freq === "once") return "单次生效";
+  const s = r.dateRange && r.dateRange.start;
+  const e = r.dateRange && r.dateRange.end;
+  /* 非必填：留空 = 始终生效 */
+  if (!s && !e) return "始终生效";
+  if (!s || !e) return "-";
+  /* 区间连接符为全角破折号 —，日期用 YYYY/MM/DD */
+  return fmtDate(s) + " — " + fmtDate(e);
+}
+
+function rangeText(r){
+  const t = plainRange(r);
+  if (t === "-" || t === "始终生效" || t === "单次生效") return '<span class="muted">' + t + "</span>";
+  return esc(t);
+}
+
+function onceTime(o){
+  if (!o || !o.date || !hasNum(o.hour) || !hasNum(o.minute)) return null;
+  const t = new Date(o.date + "T" + pad2(o.hour) + ":" + pad2(o.minute) + ":00");
+  return isNaN(t.getTime()) ? null : t.getTime();
+}
+
+/* 单次执行到点扫描；返回本次是否有状态变化。两条判定规则：
+   ① 只有「待执行」才需要判定 —— executed 是终态，不再改判；
+   ② 到点就真的执行一次，状态落成「已执行」。终态只体现在状态本身，不留时间痕迹。
+   保存即生效，不存在「到点了却还没生效」的窗口，因此这里只有一条前进路径。 */
+function scanOnce(){
+  let changed = false;
+
+  state.list.forEach(r => {
+    if (r.freq !== "once") return;
+    if (r.timerStatus !== "enabled") return;      /* 已执行是终态 */
+
+    const t = onceTime(r.once);
+    if (t == null || t > nowTs()) return;         /* 还没到点 */
+
+    r.timerStatus = "executed";
+    changed = true;
+  });
+
+  return changed;
+}
+
+/* ---- 操作记录：写入一条人工动作日志 -------------------------------------
+   recId 是写入时固化的值快照，不持有记录对象引用 ——
+   记录随后被真正删除（删除确认后 / 清空列表）也不影响日志可读。
+
+   before / after 是配置的**前后快照**（cmpSnapshot 形状），「查看详情」靠它
+   重建那次动作的左右对比表。它是日志能独立成立的关键：定时器被删掉之后，
+   列表里已经查不到这条记录，但那次改动改了什么、当时叫什么，仍然完整可读
+   （头部用 recId 指认，表里再出一行 Key）。
+   - 新增：before = null，after = 新配置
+   - 修改：before = 旧配置，after = 新配置
+   - 删除：before = 被删掉的配置，after = null（删完就不存在了）
+   - 启停：before / after 仅状态不同 */
+function logAction(action, recId, before, after){
+  /* recId = 被操作的那条定时器的 id（Key 允许重复，指认记录只能靠 id）。
+     它**绝不能叫 id**：日志对象自身已经有一个 id（= ++logSeq，是日志行的标识），
+     而 renderLog 的排序 `(b.ts-a.ts) || (b.id-a.id)` 正是靠它还原同一毫秒内的插入顺序。
+     若新字段也叫 id，日志自身的行标识就被覆盖了 —— 这种错不抛异常、不报错，
+     只在「同一秒内有连续动作」时悄悄乱序，属于最难查的一类。 */
+  state.logs.push({ id: ++logSeq, ts: Date.now(), actor: OPERATOR,
+                    action: action, recId: recId,
+                    before: before || null, after: after || null });
+  if (state.logs.length > MAX_LOG) state.logs.splice(0, state.logs.length - MAX_LOG);
+}
+
+/* 配置指纹：把「真正参与执行、且列表会展示」的字段规范化成一个字符串。
+   保存时用它判断这次编辑有没有改到东西 —— 改动的判定必须与列表展示口径一致，
+   否则会出现「看着一模一样，却被判定成一次修改」。
+   四个容易误判的点：
+   · 周几 / 日期是多选集合，点选顺序不同不算改动 → 先排序；
+   · 粒度切换会留下中间值（daily 记录里残留的 weekdays），当前粒度用不到的字段不参与比较；
+   · 单次执行不存在生效日期区间（存储为 null），不比对；
+   · 单次执行的 timerStatus 是派生值 —— 重新排期必然同时改了执行时刻（已参与比对），
+     所以不把它算进指纹，否则「终态复位成 enabled」会被误判成一次配置变更。 */
+function configFingerprint(o){
+  if (!o) return "";
+
+  const norm = a => (Array.isArray(a) ? a.slice().sort((x, y) => x - y) : []);
+  const c = o.cycle || {}, n = o.once || {}, d = o.dateRange || {};
+  const g = c.granularity;
+
+  const cyc = (g === "weekly") ? norm(c.weekdays)
+            : (g === "monthly") ? norm(c.monthDays)
+            : (g === "yearly")  ? [c.yearMonth, c.yearDay]
+            : [];
+  const once = (o.freq === "once");
+
+  return JSON.stringify([
+    String(o.key   == null ? "" : o.key).trim(),
+    String(o.value == null ? "" : o.value).trim(),
+    o.freq,
+    once ? null : (o.timerStatus || "enabled"),
+    o.freq === "cycle"    ? [g, cyc, c.hour, c.minute]   : null,
+    once ? [n.date, n.hour, n.minute] : null,
+    once ? null : [d.start || "", d.end || ""]
+  ]);
+}
+const sameConfig = (a, b) => configFingerprint(a) === configFingerprint(b);
+
+function rowHtml(r){
+  /* 保存即生效：整行只读记录自身 —— 不再有「待审配置」与「生效配置」两份数据源。
+     状态、频率、内容全部同源，不会出现一半新一半旧的拼接行。 */
+  const ts = statusLabelOf(r.freq, r.timerStatus);
+
+  /* 定时器状态列：按周期的记录给一个真开关（**只留轨道 + 滑块、不带文字** —— 说明交给
+     列头 ⓘ 气泡，见 4.5b），点它**只开二次确认弹窗**、不直接翻转。
+     freq === "once" 时只读 —— 单次执行没有启用 / 禁用语义，它只有一条时间线。 */
+  const canToggle = (r.freq !== "once");
+
+  return ''
+    + '<tr data-id="' + r.id + '">'
+    +   '<td class="td-id">' + r.id + '</td>'
+    /* 行的身份由 data-id 承载，不是 Key：Key 允许重复，列表里可能有多条同 Key 的记录，
+       编辑 / 删除 / 启停 全靠 data-id 定位，任何按 Key 找记录的做法都是错的。 */
+    +   '<td class="td-key" title="' + esc(r.key) + '">' + esc(r.key) + '</td>'
+    +   '<td class="td-val">' + esc(r.value) + '</td>'
+    +   '<td>' + FREQ_LABEL[r.freq] + '</td>'
+    +   '<td class="td-detail">' + esc(buildScheduleText(r)) + '</td>'
+    +   '<td class="td-range">' + rangeText(r) + '</td>'
+    +   '<td>'
+    +     (canToggle
+        ? '<button type="button" class="fb-switch ' + ts.cls + '"'
+            + ' role="switch" aria-checked="' + (r.timerStatus === "enabled" ? "true" : "false") + '"'
+            + ' data-act="toggle" data-id="' + r.id + '"'
+            + ' title="' + (r.timerStatus === "enabled" ? "点击禁用该定时器（需二次确认）" : "点击启用该定时器（需二次确认）") + '">'
+            + '<span class="fb-switch__track"><span class="fb-switch__thumb"></span></span>'
+            + '</button>'
+        : '<span class="fb-status ' + ts.cls + '">'
+            + '<span class="fb-status__dot"></span>'
+            + '<span class="fb-status__txt">' + ts.label + '</span>'
+            + '</span>')
+    +   '</td>'
+    +   '<td class="td-ops">'
+    +     '<button type="button" class="fb-link" data-act="edit" data-id="' + r.id + '">编辑</button>'
+    +     '<button type="button" class="fb-link fb-link--danger" data-act="del" data-id="' + r.id + '">删除</button>'
+    +   '</td>'
+    + '</tr>';
+}
+
+function renderTable(){
+  hideThTip();  /* 表格整片重建，ⓘ 会被换掉；留着 fixed 气泡只会与新的 ⓘ 脱节 */
+  scanOnce();   /* 到点判定统一在重绘前跑：初始化 / 保存 / 删除 / 启停 全覆盖 */
+
+  const region = $("#tableRegion");
+  const all = state.list;
+
+  /* 列表为空时筛选条是死控件，整条收起；一旦有数据又出现。 */
+  $("#listFilter").hidden = all.length === 0;
+
+  /* 筛选是「视图」，不进 state：控件是静态 DOM，每次重绘直接从控件读值。
+     一条记录要同时过三道判据（Key 模糊 / 频率 / 状态）。 */
+  const qKey    = $("#fKeySearch").value.trim().toLowerCase();
+  const qFreq   = $("#fFreq").value;
+  const qStatus = $("#fStatus").value;
+  const filtering = !!(qKey || qFreq || qStatus);
+
+  let list = all;
+  if (filtering) {
+    list = all.filter(r => {
+      if (qKey && r.key.toLowerCase().indexOf(qKey) < 0) return false;
+      if (qFreq && r.freq !== qFreq) return false;
+      /* 按**展示态**筛，不按存储字段：单次执行的「待执行」存的是 timerStatus:"enabled" */
+      if (qStatus && statusKeyOf(r) !== qStatus) return false;
+      return true;
+    });
+  }
+
+  /* 有筛选时补一句「筛出多少」；重置按钮只在真有筛选时出现。 */
+  $("#fReset").hidden = !filtering;
+  $("#listCount").textContent = filtering
+    ? "筛选出 " + list.length + " 条 / 共 " + all.length + " 条"
+    : "共 " + all.length + " 条";
+
+  if (!all.length) {
+    region.innerHTML = '<div class="empty">' + EMPTY_SVG + "<div>暂无定时器，点击右上角「新增定时器」创建</div></div>";
+    return;
+  }
+  /* 「一条都没有」与「筛没了」是两种空态：后者要做的是调条件，不该再出现插画 */
+  if (!list.length) {
+    region.innerHTML = '<div class="empty">没有符合筛选条件的定时器</div>';
+    return;
+  }
+
+  region.innerHTML = ''
+    + '<div class="table-wrap"><table class="fb-table">'
+    + '<colgroup>'
+    +   '<col style="width:92px"><col style="width:190px"><col style="width:110px">'
+    +   '<col style="width:100px"><col style="width:240px"><col style="width:190px">'
+    +   '<col style="width:160px"><col style="width:130px">'
+    + '</colgroup>'
+    + '<thead><tr>'
+    +   '<th>定时器ID</th><th>Key</th><th>Value</th><th>执行频率</th><th>执行详情</th>'
+    +   '<th>生效日期区间</th>'
+    /* 「定时器状态」列头挂一个 ⓘ：两类行在这一列的口径不同（按周期可启停 / 单次执行只读），
+       是这一列最容易被误读的地方 —— 用一句悬浮说明讲清，替代"给单次执行加个假开关"。
+       ⓘ 是 button（可聚焦、可键盘触达），不是装饰性图标。 */
+    +   '<th>定时器状态'
+    +     '<button type="button" class="th-info" aria-label="定时器状态列说明" aria-describedby="thStatusTip">'
+    +       '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">'
+    +         '<circle cx="8" cy="8" r="6.3" stroke="currentColor" stroke-width="1.4"/>'
+    +         '<path d="M8 7.3v3.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>'
+    +         '<circle cx="8" cy="4.9" r=".95" fill="currentColor"/>'
+    +       '</svg>'
+    +     '</button>'
+    +   '</th>'
+    +   '<th class="th-ops">操作</th>'
+    + '</tr></thead>'
+    + '<tbody>' + list.map(rowHtml).join("") + '</tbody>'
+    + '</table></div>';
+}
+
+/* 一键清空三项筛选（只清控件，不重绘；调用方自己接 renderTable）。
+   演示入口（载入 / GM / 清空）都会调它 —— 否则上一次筛过的条件会跟着新数据留下来，
+   看起来像「数据没载入」。 */
+function resetListFilter(){
+  $("#fKeySearch").value = "";
+  $("#fFreq").value   = "";
+  $("#fStatus").value = "";
+}
+
+/* ==========================================================================
+   7. 弹窗：表单状态与渲染
+   ========================================================================== */
+function defaultForm(){
+  return {
+    key: "",
+    value: "",
+    freq: "cycle",
+    cycle   : { granularity:"daily", weekdays:[], monthDays:[], yearMonth:null, yearDay:null, hour:null, minute:null },
+    once    : { date:"", hour:null, minute:null },
+    /* 生效区间的单选项：**只是弹窗内的表单态，不进 cfg、不进指纹**。
+       之所以不需要存进记录：切回「始终生效」时两个日期会被清空，
+       于是「日期为空 ⟺ 始终生效」恒成立，记录侧一个字段就够（一份配置只允许有一个取法）。 */
+    rangeMode: "always",
+    dateRange: { start:"", end:"" },
+    timerStatus: "enabled"        /* 新建一律「启用」；改状态只在列表的开关上（见 4.4 注释） */
+  };
+}
+
+/* ---- 控件片段 ---- */
+function hourOpts(v){
+  let s = '<option value="">时</option>';
+  for (let i = 0; i < 24; i++) s += '<option value="' + i + '"' + (v === i ? " selected" : "") + '>' + pad2(i) + '</option>';
+  return s;
+}
+function minOpts(v){
+  let s = '<option value="">分</option>';
+  for (let i = 0; i < 60; i++) s += '<option value="' + i + '"' + (v === i ? " selected" : "") + '>' + pad2(i) + '</option>';
+  return s;
+}
+function monthOpts(v){
+  let s = '<option value="">月</option>';
+  for (let i = 1; i <= 12; i++) s += '<option value="' + i + '"' + (v === i ? " selected" : "") + '>' + i + " 月</option>";
+  return s;
+}
+function dayOpts(v){
+  let s = '<option value="">日</option>';
+  for (let i = 1; i <= 31; i++) s += '<option value="' + i + '"' + (v === i ? " selected" : "") + '>' + i + " 日</option>";
+  return s;
+}
+function tagHtml(group, val, label, on, square){
+  return '<button type="button" class="fb-tag' + (square ? " fb-tag--num" : "") + (on ? " is-on" : "")
+       + '" data-tag="' + group + '" data-val="' + val + '">' + label + '</button>';
+}
+/* 字段容器（id 与 ERR_FIELD_ID 对应） */
+function fieldWrap(id, label, control, hint, required){
+  return '<div class="field" id="' + id + '">'
+       +   '<div class="field__label">' + label + (required ? '<span class="req">*</span>' : "") + '</div>'
+       +   control
+       +   (hint ? '<div class="field__hint">' + hint + '</div>' : "")
+       +   '<div class="field__err"></div>'
+       + '</div>';
+}
+function timeInline(hourId, minId, h, m){
+  return '<div class="inline">'
+       +   '<select class="fb-select w-96" id="' + hourId + '">' + hourOpts(h) + '</select>'
+       +   '<span class="sep">:</span>'
+       +   '<select class="fb-select w-96" id="' + minId + '">' + minOpts(m) + '</select>'
+       + '</div>';
+}
+
+/* ---- 动态区域：频率 / 粒度切换时整体重绘 ---- */
+function renderDynamicArea(){
+  const f = state.form;
+  if (!f) return;
+
+  let h = "";
+
+  if (f.freq === "cycle") {
+    const g = f.cycle;
+
+    const gran = GRAN_ORDER.map(k =>
+      '<button type="button" class="fb-seg__item' + (g.granularity === k ? " is-on" : "") + '" data-gran="' + k + '">'
+      + GRAN_LABEL[k] + '</button>'
+    ).join("");
+    h += fieldWrap("f-granularity", "周期粒度", '<div class="fb-seg">' + gran + '</div>');
+
+    if (g.granularity === "weekly") {
+      h += fieldWrap("f-cycleWeek", "星期几",
+        '<div class="fb-tags">' + WD.map((w, i) => tagHtml("week", i + 1, w, g.weekdays.indexOf(i + 1) >= 0)).join("") + '</div>',
+        "可多选，至少选择 1 个", true);
+    } else if (g.granularity === "monthly") {
+      const nums = [];
+      for (let i = 1; i <= 31; i++) nums.push(tagHtml("month", i, i, g.monthDays.indexOf(i) >= 0, true));
+      h += fieldWrap("f-cycleMonth", "日期",
+        '<div class="fb-tags">' + nums.join("") + '</div>',
+        "可多选，至少选择 1 个<br>该月无此日期时将自动跳过该次执行", true);
+    } else if (g.granularity === "yearly") {
+      h += fieldWrap("f-cycleYear", "月 / 日",
+        '<div class="inline">'
+        + '<select class="fb-select w-96" id="in-ym">' + monthOpts(g.yearMonth) + '</select>'
+        + '<select class="fb-select w-96" id="in-yd">' + dayOpts(g.yearDay) + '</select>'
+        + '</div>',
+        "非闰年的 2 月 29 日将自动跳过该次执行", true);
+    }
+
+    h += fieldWrap("f-time", "触发时间", timeInline("in-hour", "in-min", g.hour, g.minute), "", true);
+  }
+
+  else if (f.freq === "once") {
+    const o = f.once;
+    h += fieldWrap("f-onceDate", "执行日期",
+      '<div class="inline">'
+      + '<input type="date" class="fb-input w-160" id="in-oncedate" value="' + esc(o.date) + '">'
+      + '<span class="dow" id="onceDow"></span>'
+      + '</div>', "", true);
+
+    h += fieldWrap("f-time", "执行时间", timeInline("in-oncehour", "in-oncemin", o.hour, o.minute), "", true);
+  }
+
+  $("#dynamicArea").innerHTML = h;
+}
+
+/* ---- 表单 ⇄ DOM 同步 ---- */
+function syncFormFromDOM(){
+  const f = state.form;
+  if (!f) return;
+
+  const keyEl = $("#in-key");
+  if (keyEl) f.key = keyEl.value;
+
+  const valEl = $("#in-value");
+  if (valEl) f.value = valEl.value;
+
+  const num = el => (el && el.value !== "" ? Number(el.value) : null);
+
+  const h = $("#in-hour");   if (h)  f.cycle.hour   = num(h);
+  const mi = $("#in-min");   if (mi) f.cycle.minute = num(mi);
+  const ym = $("#in-ym");    if (ym) f.cycle.yearMonth = num(ym);
+  const yd = $("#in-yd");    if (yd) f.cycle.yearDay   = num(yd);
+
+  const od = $("#in-oncedate");  if (od) f.once.date   = od.value;
+  const oh = $("#in-oncehour");  if (oh) f.once.hour   = num(oh);
+  const om = $("#in-oncemin");   if (om) f.once.minute = num(om);
+
+  /* 单次执行时该行整体隐藏（元素仍在 DOM 中），值照常回填，切回其他频率即可恢复 */
+  const rs = $("#in-rstart");    if (rs) f.dateRange.start = rs.value;
+  const re = $("#in-rend");      if (re) f.dateRange.end   = re.value;
+
+  /* 生效区间的单选项：常态由 change 事件即时写进 state.form；这里兜一次底，
+     保证任何走 syncFormFromDOM 的入口（尤其是点保存）拿到的都是 DOM 的真实值 */
+  const rm = document.querySelector('input[name="rangeMode"]:checked');
+  if (rm) f.rangeMode = rm.value;
+}
+
+/* ---- 预览 ---- */
+function renderPreview(){
+  const f = state.form;
+  if (!f) return;
+
+  $("#previewText").textContent = buildScheduleText(f);
+
+  /* 单次执行 → 生效日期区间整行隐藏（两个单选项与日期框一起消失） */
+  const rangeField = $("#f-range");
+  if (rangeField) rangeField.hidden = (f.freq === "once");
+
+  /* 按周期下，再决定日期框要不要展开 */
+  syncRangePicker();
+
+  /* 单次执行 → 自动带出周几（只读） */
+  const dowEl = $("#onceDow");
+  if (dowEl) dowEl.textContent = f.once.date ? dowOf(f.once.date) : "";
+}
+
+function setFreqSeg(){
+  const f = state.form;
+  $$("#segFreq .fb-seg__item").forEach(b => b.classList.toggle("is-on", b.dataset.freq === f.freq));
+}
+
+/* 生效区间的单选项 ⇄ state.form。日期框只在「固定期限内生效」时展开。
+   两者都只是弹窗内的表单态，不落进记录。 */
+function setRangeSeg(){
+  const f = state.form;
+  $$('input[name="rangeMode"]').forEach(el => { el.checked = (el.value === f.rangeMode); });
+}
+function syncRangePicker(){
+  const f = state.form;
+  const box = $("#rangePicker");
+  if (box) box.hidden = (f.rangeMode !== "fixed");
+}
+
+function openModal(id){
+  const isNew = (id == null);
+  state.editingId = isNew ? null : id;
+  state.errors = {};
+  state.reschedule = false;
+
+  if (isNew) {
+    state.form = defaultForm();
+  } else {
+    const r = state.list.find(x => x.id === id);
+    if (!r) { state.editingId = null; return; }
+
+    /* 「已执行」是终态，不能作为编辑的目标态：编辑它等于重新排期，状态默认回「启用」。
+       终态只认记录自身 —— 保存即生效，不存在「改了但还没生效」的中间态。 */
+    const terminal = (r.timerStatus === "executed");
+    state.reschedule = terminal;
+
+    const range = clone(r.dateRange) || { start:"", end:"" };
+
+    state.form = {
+      key: r.key,
+      value: r.value,
+      freq: r.freq,
+      cycle: clone(r.cycle) || defaultForm().cycle,
+      once: clone(r.once) || defaultForm().once,
+      /* 日期为空 ⟺ 始终生效（切回「始终生效」时日期会被清掉），所以这里能直接反推单选项 */
+      rangeMode: (range.start || range.end) ? "fixed" : "always",
+      dateRange: range,
+      timerStatus: terminal ? "enabled" : r.timerStatus
+    };
+    if (!state.form.cycle)    state.form.cycle    = defaultForm().cycle;
+    if (!state.form.once)     state.form.once     = defaultForm().once;
+  }
+
+  $("#modalTitle").textContent = isNew ? "新增定时器" : "编辑定时器";
+  $("#in-key").value   = state.form.key;
+  $("#in-value").value = state.form.value;
+  $("#in-rstart").value = state.form.dateRange.start || "";
+  $("#in-rend").value   = state.form.dateRange.end   || "";
+
+  setFreqSeg();
+  setRangeSeg();
+  renderDynamicArea();
+  renderPreview();
+  applyErrors();
+
+  /* 说明条只剩「重新排期」一种情形：编辑一条「已执行」的单次执行时，提醒这不是普通修改。
+     新增 / 一般编辑不渲染 —— 生效口径统一由「生效前确认」弹窗说明（renderConfirm），
+     同一件事只说一遍。非重新排期时容器收起且文案清空，不留空盒子。 */
+  const warn = state.reschedule;
+  $("#formAlert").hidden = !state.reschedule;
+  $("#formAlert").textContent = warn
+    ? "该定时器已执行完成。这是重新排期：把执行时间改到未来，确认后回到「待执行」，到点再执行一次。"
+    : "";
+  /* 主按钮只负责「进入生效前确认」，新增 / 编辑两个入口统一叫「确定」——
+     真正的写入发生在下一层确认弹窗里（见 renderConfirm），所以不叫「保存」。 */
+  $("#btnSave").textContent = "确定";
+
+  $("#mask").hidden = false;
+  document.body.style.overflow = "hidden";
+  $("#modal").scrollTop = 0;
+}
+
+function closeModal(){
+  $("#mask").hidden = true;
+  document.body.style.overflow = "";
+  state.form = null;
+  state.editingId = null;
+  state.errors = {};
+}
+
+/* ==========================================================================
+   8. 校验层
+   ========================================================================== */
+/* 字段级错误的唯一出口：加红框 + 把文案写进字段下方的 .field__err。
+   errors 的 value 就是该字段要显示的文案；空串表示「只标红、不占文案」
+   —— 「执行时间需晚于当前时间」的文案落在执行日期上，时间控件只跟着一起变红。 */
+function setFieldErr(key, msg){
+  const id = ERR_FIELD_ID[key];
+  if (!id) return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add("is-error");
+  const box = el.querySelector(".field__err");
+  if (box) box.textContent = msg || "";
+  state.errors[key] = msg || "";
+}
+function clearErr(key){
+  const id = ERR_FIELD_ID[key];
+  if (id) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.remove("is-error");
+      const box = el.querySelector(".field__err");
+      if (box) box.textContent = "";
+    }
+  }
+  delete state.errors[key];
+}
+/* 切换频率 / 粒度时，只丢掉与上一个分支相关的错误，Key / Value 的错误保留 */
+function dropErr(keys){
+  keys.forEach(k => delete state.errors[k]);
+}
+function applyErrors(){
+  $$(".field.is-error").forEach(el => {
+    el.classList.remove("is-error");
+    const box = el.querySelector(".field__err");
+    if (box) box.textContent = "";
+  });
+  Object.keys(state.errors || {}).forEach(k => setFieldErr(k, state.errors[k]));
+}
+
+/* 返回 { ok, fieldErrors, message }
+   缺失类文案统一为「请设置XXX」，多条缺失合并成一条、用「、」连接字段名：
+   例如 请设置Key、Value、触发时间
+   非缺失类（Key超长 / Value非法 / 结束早于开始）保持原样，按字段顺序插入。
+   fieldErrors 的 value 直接是**该字段要显示的文案**（供字段下方红字用），不是布尔。
+   list / editingId 两个入参保留但已不再使用 —— Key 不做唯一性校验后，
+   校验就完全是「逐字段自证」的纯函数了；签名不动是为了不被调用方与测试牵着改。 */
+function validate(f, list, editingId){
+  const fieldErrors = {};
+  const items = [];                                     // { text, noun }
+  const noun  = (field, text) => { fieldErrors[field] = "请设置" + text; items.push({ text: text, noun: true  }); };
+  const plain = (field, text) => { if (field) fieldErrors[field] = text; items.push({ text: text, noun: false }); };
+
+  /* --- Key：必填 / ≤64 字符。**不做项目内唯一性校验** ---
+     Key 允许重复：同一个 Key 可以建多个定时器（例如同一 Key 在不同时间段写不同的值）。
+     记录的唯一性由自增 id 承载 —— 列表的 data-id、编辑 / 删除 / 启停、确认弹窗头部
+     全都按 id 走，没有任何一处依赖「Key 不重复」。 */
+  const key = (f.key || "").trim();
+  if (!key) {
+    noun("key", "Key");
+  } else if (key.length > 64) {
+    plain("key", "Key长度不能超过 64 个字符");
+  }
+
+  /* --- Value：必填 / 仅数字 --- */
+  const val = (f.value || "").trim();
+  if (!val) {
+    noun("value", "Value");
+  } else if (!/^-?\d+(\.\d{1,2})?$/.test(val)) {
+    plain("value", "Value仅允许数字（支持负数、小数点）");
+  }
+
+  /* --- 执行频率相关（按表单自然顺序） --- */
+  if (f.freq === "cycle") {
+    const g = f.cycle;
+
+    if (g.granularity === "weekly") {
+      if (!(g.weekdays || []).length) noun("cycleWeek", "执行的星期");
+    } else if (g.granularity === "monthly") {
+      if (!(g.monthDays || []).length) noun("cycleMonth", "执行的日期");
+    } else if (g.granularity === "yearly") {
+      if (!hasNum(g.yearMonth) || !hasNum(g.yearDay)) noun("cycleYear", "执行的月日");
+    }
+
+    if (!hasNum(g.hour) || !hasNum(g.minute)) noun("time", "触发时间");
+  }
+
+  else if (f.freq === "once") {
+    const o = f.once;
+    if (!o.date) noun("onceDate", "执行日期");
+    if (!hasNum(o.hour) || !hasNum(o.minute)) noun("time", "触发时间");
+
+    /* 单次执行是一个一次性时点：必须是未来时刻，否则存下来就是废数据 */
+    if (o.date && hasNum(o.hour) && hasNum(o.minute)) {
+      const t = new Date(o.date + "T" + pad2(o.hour) + ":" + pad2(o.minute) + ":00");
+      if (!isNaN(t.getTime()) && t.getTime() <= nowTs()) {
+        plain("onceDate", "执行时间需晚于当前时间");
+        fieldErrors.time = "";   /* 日期 + 时间共同构成执行时刻，两处一起标红；文案只落在日期上 */
+      }
+    }
+  }
+
+  /* --- 生效日期区间：只在选中「固定期限内生效」时才构成约束 --- */
+  if (f.freq !== "once" && f.rangeMode === "fixed") {
+    const rs = (f.dateRange.start || "").trim();
+    const re = (f.dateRange.end   || "").trim();
+    if (rs && re) {
+      if (re < rs) plain("range", "生效结束日期不能早于开始日期");
+    } else {
+      /* 只填一端 → 语义不完整；两端都没填 → 选了「固定期限内生效」却没说期限。
+         两种情形都不构成一个区间，共用同一条文案。 */
+      plain("range", "生效日期区间需同时填写开始与结束日期");
+    }
+  }
+
+  /* --- 合并：连续的缺失字段名归入同一个「请设置…」片段，其余按原顺序保留 --- */
+  const parts = [];
+  let buf = [];
+  const flush = () => { if (buf.length) { parts.push("请设置" + buf.join("、")); buf = []; } };
+  items.forEach(it => { if (it.noun) buf.push(it.text); else { flush(); parts.push(it.text); } });
+  flush();
+
+  return { ok: items.length === 0, fieldErrors: fieldErrors, message: parts.join("、") };
+}
+
+/* ==========================================================================
+   9. 业务动作
+   ========================================================================== */
+/* 保存 = 改动判定 → 校验 → 开「生效前确认」弹窗。
+   顺序是有讲究的：**先判有没有改动，再判填得对不对**。
+   一个字段都没动却被必填规则拦下，用户会以为是自己填错了；先说清「你没改」，才轮到「哪里不对」。
+   新增没有基线可比（弹窗打开时本来就是空的），所以跳过改动判定、直接进校验。
+   真正的写入在 commitSave()：确认之前，列表里的一切都不动，也不写操作记录。 */
+function onSave(){
+  syncFormFromDOM();
+
+  const f = state.form;
+  const isNew = (state.editingId == null);
+  const cfg = {
+    key: f.key.trim(),
+    value: f.value.trim(),
+    freq: f.freq,
+    cycle: clone(f.cycle),
+    once: clone(f.once),
+    dateRange: f.freq === "once" ? null : clone(f.dateRange),
+    timerStatus: f.timerStatus || "enabled"
+  };
+
+  /* 单次执行的状态是派生值：校验已保证执行时刻在未来 → 待执行（重新排期同理） */
+  if (cfg.freq === "once") cfg.timerStatus = "enabled";
+
+  /* ---- ① 改动判定（仅编辑，基线是记录自身）----
+     无改动时**不关弹窗**：用户的意图多半是「再改点什么」，关掉等于把他刚打开的表单收走。 */
+  let left = null, r = null;
+  if (!isNew) {
+    r = state.list.find(x => x.id === state.editingId);
+    if (!r) { closeModal(); renderTable(); return; }   /* 编辑期间该条已被移除 */
+
+    if (sameConfig(r, cfg)) { toast("当前无修改，无法提交"); return; }
+  }
+
+  /* ---- ② 校验：合规（非法字符 / 取值）与必填 ---- */
+  const res = validate(state.form, state.list, state.editingId);
+  state.errors = res.fieldErrors;
+  applyErrors();
+
+  if (!res.ok) { toast(res.message); return; }
+
+  /* ---- ③ 全部通过 → 生效前确认 ----
+     左右两侧都存纯数据副本：弹窗开着期间到点扫描会改记录，
+     若持有引用，两列会当着用户的面漂移（单次执行尤其明显）。 */
+  if (!isNew) left = cmpSnapshot(r);
+  openConfirm(isNew ? "add" : "edit", isNew ? null : state.editingId, left, cfg);
+}
+
+/* 确认生效 —— 新增 / 修改唯一的写入点：到这里才改列表、才写操作记录 */
+function commitSave(){
+  const ctx = confirmCtx;
+  if (!ctx || (ctx.action !== "add" && ctx.action !== "edit")) return;
+
+  const isAdd = (ctx.action === "add");
+  const cfg   = clone(ctx.right);
+
+  /* 被操作记录的 id：新增态此刻才分配，所以必须先取出来再用 ——
+     写成 Object.assign({ id: state.nextId++ }, cfg) 之后再去读 state.nextId，
+     会拿到 +1 之后的错值，日志的 ID 列会整列偏移一位。 */
+  let recId;
+
+  if (isAdd) {
+    recId = state.nextId++;
+    state.list.unshift(Object.assign(
+      { id: recId, createdAt: Date.now() }, cfg));
+
+  } else {
+    const r = state.list.find(x => x.id === ctx.id);
+    if (!r) {                     /* 理论上不可能：确认期间没人能删除它 */
+      closeConfirm();
+      closeModal();
+      renderTable();
+      toast("该定时器已不存在，本次修改未写入");
+      return;
+    }
+    recId = r.id;
+    Object.assign(r, cfg);        /* 直接覆盖生效；单次执行回到「待执行」，交给扫描接管 */
+  }
+
+  /* 写入点之一（新增 / 修改共用这一句）。
+     before / after 供「查看详情」重建对比表：
+     - 新增没有旧配置，before = null
+     - 修改的旧配置只能来自 ctx.left（此刻 r 已被 Object.assign(r, cfg) 覆盖，
+       改动前的值只剩这一份快照里有）；再 clone 一次，不与弹窗上下文共享引用 */
+  logAction(ctx.action, recId,
+    isAdd ? null : clone(ctx.left),
+    cmpSnapshot(cfg));
+
+  closeConfirm();
+  closeModal();
+  renderTable();
+  toast(isAdd ? "已新增定时器「" + cfg.key + "」" : "已保存修改，配置已立即生效", "success");
+}
+
+/* 删除：先过一道前置校验（启用中的按周期记录不许删），再开确认弹窗 ——
+   删错了没有任何补救入口，二次确认是唯一防线。 */
+function deleteTimer(id){
+  const r = state.list.find(x => x.id === id);
+  if (!r) return;
+
+  /* 前置校验：**启用中**的按周期记录不允许删除，要求先禁用。
+     判据必须用**存储字段** timerStatus，不能用展示态 —— 单次执行的记录里它恒为
+     "enabled"（展示态才被 statusKeyOf 归一成 待执行 / 已执行），照展示态判会把
+     单次执行一起挡掉。单次执行没有启用 / 禁用语义，故直接跳过这条校验。 */
+  if (r.freq !== "once" && r.timerStatus === "enabled") {
+    toast("该定时器处于启用状态，请先禁用再删除");
+    return;
+  }
+
+  openConfirm("delete", id, null, cmpSnapshot(r));
+}
+
+/* 确认删除 —— 删除唯一的写入点 */
+function commitDelete(){
+  const ctx = confirmCtx;
+  if (!ctx || ctx.action !== "delete") return;
+
+  const r = state.list.find(x => x.id === ctx.id);
+  closeConfirm();
+  if (!r) { renderTable(); return; }
+
+  /* r 是对象引用，filter 走完之后照样能读 r.id；显式取一次是为了让「日志记的就是这一条」更醒目 */
+  const recId = r.id;
+  state.list = state.list.filter(x => x.id !== recId);
+  /* 写入点之二。删除的 before = 被删掉的那份配置（ctx.right 在 openConfirm 时
+     就是 cmpSnapshot(r)）；after = null，因为删完这条就不存在了。 */
+  logAction("delete", recId, clone(ctx.right), null);
+  renderTable();
+  toast("已删除定时器「" + r.key + "」", "success");
+}
+
+/* 列表启停（入口）：点状态开关 → 开二次确认弹窗。
+   只有按周期的记录可点 —— 单次执行没有启用 / 禁用语义，它只有一条时间线。
+
+   已经保存即生效、删错了也没得反悔，启停是列表上唯一一个「按一下线上行为就变」的操作，
+   所以它也要过一次确认。两边都存纯数据副本：弹窗开着时到点扫描仍可能改记录。 */
+function toggleTimer(id){
+  const r = state.list.find(x => x.id === id);
+  if (!r) return;
+
+  if (r.freq === "once") { toast("单次执行没有启用 / 禁用语义"); return; }
+
+  const before = cmpSnapshot(r);
+  const after  = Object.assign(cmpSnapshot(r), {
+    timerStatus: (r.timerStatus === "enabled") ? "disabled" : "enabled"
+  });
+
+  openConfirm("toggle", id, before, after);
+}
+
+/* 确认启停 —— 启停唯一的写入点 */
+function commitToggle(){
+  const ctx = confirmCtx;
+  if (!ctx || ctx.action !== "toggle") return;
+
+  const r = state.list.find(x => x.id === ctx.id);
+  closeConfirm();
+
+  if (!r) { renderTable(); return; }                    /* 确认期间记录已不存在 */
+  if (r.freq === "once") { renderTable(); return; }      /* 语义变了就作废，不硬写 */
+
+  /* 目标态取点开时的意图，不取「当前值的反面」：万一弹窗开着期间状态被别处改过，
+     按意图写入才是用户在弹窗上确认过的那个结果。 */
+  const toEnable = (ctx.right.timerStatus === "enabled");
+  if (r.timerStatus === (toEnable ? "enabled" : "disabled")) { renderTable(); return; }  /* 已是目标态，不写空日志 */
+
+  r.timerStatus = toEnable ? "enabled" : "disabled";
+
+  /* 写入点之三。before / after 取点开弹窗时固化的两份快照（只差 timerStatus），
+     不重新读 r —— 弹窗开着期间记录可能已被到点扫描改过。
+
+     动作取 enable / disable 而非笼统的 toggle：日志正文里唯一的动作描述就是
+     「操作类型」那一枚徽标，写「启停」看不出这次是开还是关。 */
+  logAction(toEnable ? "enable" : "disable", r.id,
+    clone(ctx.left), clone(ctx.right));
+  renderTable();
+  toast("已" + (toEnable ? "启用" : "禁用") + "「" + r.key + "」", "success");
+}
+
+/* ==========================================================================
+   10c. 操作记录
+   —— 全局一个入口 + 一个弹窗，按时间倒序展示；不做逐行入口
+   ========================================================================== */
+function logRowHtml(r){
+  const a = LOG_ACTION[r.action] || { label:"—", cls:"badge-gray" };
+  return ''
+    + '<tr>'
+    /* ID 列在最前，它是这一行唯一指得准的东西：Key 允许重复，而这一版也不再展示 Key。
+       这个 ID 是**被操作定时器的 id**（日志写入时的快照），定时器后来被删掉了也照样显示 ——
+       列表里查不到这个 ID 是正常的，那正说明它已经不在了。
+       「它当时叫什么、改成了什么」一律点末列的「查看详情」看。 */
+    +   '<td class="td-id">'   + (r.recId == null ? "—" : r.recId) + '</td>'
+    +   '<td class="td-time">'  + fmtDateTime(r.ts) + '</td>'
+    +   '<td class="td-actor">' + esc(r.actor) + '</td>'
+    +   '<td><span class="fb-badge ' + a.cls + '">' + esc(a.label) + '</span></td>'
+    /* 查看详情：按**日志行自身的 id**（r.id）反查条目，不是 recId ——
+       recId 指向被操作的定时器（可能早已被删），r.id 才是这条日志的行标识。 */
+    +   '<td class="td-ops"><button type="button" class="fb-link" data-log-id="' + r.id + '">查看详情</button></td>'
+    + '</tr>';
+}
+
+function renderLog(){
+  const region = $("#logRegion");
+  const action = $("#logAction").value;
+
+  /* 一条日志都没有时筛选是死控件，收起来；筛没了则保留（还要靠它撤销筛选） */
+  $("#maskLog .log-filter").hidden = (state.logs.length === 0);
+
+  let rows = state.logs.slice();
+  if (action) rows = rows.filter(r => r.action === action);
+
+  /* 倒序：ts 降序；同毫秒（同一秒内的连续动作）按 id 降序还原插入顺序 */
+  rows.sort((a, b) => (b.ts - a.ts) || (b.id - a.id));
+
+  if (!rows.length) {
+    /* 「一条都没有」与「筛没了」是两种空态，后者不该再出现插画 */
+    const isEmpty = state.logs.length === 0;
+    region.innerHTML = '<div class="empty">' + (isEmpty ? EMPTY_SVG : "")
+      + (isEmpty ? "暂无操作记录" : "没有符合筛选条件的操作记录") + '</div>';
+    return;
+  }
+
+  /* 5 列：定时器ID / 时间 / 操作人 / 操作类型 / 操作。
+     没有「操作详情」列：正文只回答「谁在什么时候对哪条记录做了什么」，
+     「当时叫什么、改成了什么」由末列的「查看详情」承载，不在正文里复述。
+     固定列合计 100+220+160+140+100 = 720px，弹窗可用宽度 1020px 内不会横向滚动
+     （min-width 见 .fb-table--log）。 */
+  region.innerHTML = ''
+    + '<div class="table-wrap"><table class="fb-table fb-table--log">'
+    + '<colgroup><col style="width:100px"><col style="width:220px"><col style="width:160px">'
+    +   '<col style="width:140px"><col style="width:100px"></colgroup>'
+    + '<thead><tr>'
+    +   '<th title="被操作定时器的 ID；定时器后来被删除了也照样保留（日志存的是写入时的快照）">定时器ID</th>'
+    +   '<th title="配置变更的生效时间（保存即生效，即点下确认的那一刻）">时间</th>'
+    +   '<th>操作人</th><th>操作类型</th><th>操作</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows.map(logRowHtml).join("") + '</tbody>'
+    + '</table></div>';
+}
+
+function openLog(){
+  renderLog();
+  $("#maskLog").hidden = false;
+}
+/* 关闭不重置筛选：保留上次视图，便于反复比对同一批记录 */
+function closeLog(){ $("#maskLog").hidden = true; }
+
+/* ==========================================================================
+   10b. 生效前确认（左右对比）
+   —— 新增 / 修改 / 删除 / 启停四个入口共用：左边是「现在是什么样」，右边是「确认后变成什么样」
+   复用原「变更详情」的 .detail__meta / .cmp-table 全套样式与差异高亮口径
+   ========================================================================== */
+/* 配置对比表的字段清单 —— 「生效前确认」与「操作详情（只读）」共用同一份。
+   **不含「定时器状态」**：新增恒为「启用」、修改时表单里没有状态字段（保存时原样带过去）、
+   删除时它也不属于「将被删除的配置」—— 三类动作都不可能改变它。
+   摆一行永远不变的东西，只会让人以为这次确认会动到启停。
+   它只出现在启停的对比表里（TOGGLE_FIELDS = 状态行 + 本清单）。 */
+const CMP_FIELDS = [
+  ["Key",          "key"],
+  ["Value",        "value"],
+  ["执行频率",      "freq"],
+  ["执行详情",      "schedule"],
+  ["生效日期区间",  "range"]
+];
+
+/* 对比表用的纯文本取值 —— 与列表展示同一口径 */
+function cmpVal(v, k){
+  switch (k) {
+    case "key":         return String(v.key == null ? "" : v.key);
+    case "value":       return String(v.value == null ? "" : v.value);
+    case "freq":        return FREQ_LABEL[v.freq] || "—";
+    case "schedule":    return buildScheduleText(v);
+    case "range":       return plainRange(v);
+    case "timerStatus": return statusLabelOf(v.freq, v.timerStatus).label;
+  }
+  return "—";
+}
+
+/* 记录的纯数据副本：字段口径与 cmpVal 一一对应，弹窗全程只读副本 */
+function cmpSnapshot(r){
+  return {
+    key: r.key, value: r.value, freq: r.freq,
+    cycle: clone(r.cycle), once: clone(r.once),
+    dateRange: clone(r.dateRange),
+    timerStatus: r.timerStatus   /* 只有启停的对比表会展示它；新增 / 修改 / 删除的对比表不含它 */
+  };
+}
+
+/* 启停的对比表 = 「定时器状态」行 + 完整配置行（CMP_FIELDS）。
+   状态行放最前：它是这次操作**唯一会变**、也是唯一会亮高亮的一行；
+   后面几行配置左右完全相同、不高亮，作用是让「这条记录当时是什么」也留在归档里
+   —— 定时器可能早已被改掉甚至删掉，日志里的快照是唯一的凭据。
+   ⚠️ 必须独立声明，**不要**写成 CMP_FIELDS.filter(...)：状态本就不在 CMP_FIELDS 里，
+   滤出来会是空数组（对比表直接空白），而且**不报错**。 */
+const TOGGLE_FIELDS = [["定时器状态", "timerStatus"], ...CMP_FIELDS];
+
+const CONFIRM_META = {
+  add   : { title:"新增定时器 · 确认生效", badge:{ label:"新增", cls:"badge-green"  },
+            btn:"确认生效", leftHead:"当前生效配置", rightHead:"即将生效的配置" },
+  edit  : { title:"修改定时器 · 确认生效", badge:{ label:"修改", cls:"badge-orange" },
+            btn:"确认生效", leftHead:"当前生效配置", rightHead:"即将生效的配置" },
+  toggle: { title:"切换定时器状态 · 确认", badge:{ label:"启停", cls:"badge-blue"   },
+            btn:"确认切换", leftHead:"当前状态",     rightHead:"切换后" },
+  delete: { title:"删除定时器 · 确认",     badge:{ label:"删除", cls:"badge-red"    },
+            btn:"确认删除", leftHead:"",             rightHead:"将被删除的配置" }
+};
+
+/* 对比表的 HTML 生成 —— 「生效前确认」与「操作详情（只读）」**共用这一份**。
+   抽成纯函数是为了让两处一定长得一样：列数、差异高亮、取值格式化只有一套口径。
+
+   o = { badge, idText, leftHead, rightHead, single, fields, left, right }
+   - single = true（新增 / 删除）时没有左列，右列 colspan=2，也永远不会判差异
+   - left / right 必须是 cmpSnapshot 形状的纯数据副本；非 single 场景两者都不能为
+     null（cmpVal 会直接读 v.key） */
+function buildCmpHtml(o){
+  let h = '<div class="detail__meta">'
+    +   '<span class="fb-badge ' + o.badge.cls + '">' + o.badge.label + '</span>'
+    +   (o.idText ? '<span class="detail__id">' + esc(o.idText) + '</span>' : "")
+    + '</div>';
+
+  h += '<table class="cmp-table"><thead><tr>'
+    +    '<th class="cmp-table__k">字段</th>'
+    +    (o.single ? "" : '<th>' + o.leftHead + '</th>')
+    +    '<th' + (o.single ? ' colspan="2"' : '') + '>' + o.rightHead + '</th>'
+    +  '</tr></thead><tbody>';
+
+  o.fields.forEach(pair => {
+    const label = pair[0], k = pair[1];
+    const rv = cmpVal(o.right, k);
+    const lv = o.single ? null : cmpVal(o.left, k);
+    const diff = (lv !== null && lv !== rv);
+
+    h += '<tr>'
+      +    '<td class="cmp-table__k">' + label + '</td>'
+      +    (o.single ? "" : '<td' + (diff ? ' class="is-was"' : "") + '>' + esc(lv) + '</td>')
+      +    '<td' + (o.single ? ' colspan="2"' : '') + (diff ? ' class="is-changed"' : "") + '>'
+      +      esc(rv) + '</td>'
+      +  '</tr>';
+  });
+  h += '</tbody></table>';
+  return h;
+}
+
+function renderConfirm(){
+  const ctx = confirmCtx;
+  if (!ctx) return;
+  const meta = CONFIRM_META[ctx.action];
+  if (!meta) { closeConfirm(); return; }
+
+  const isDel = (ctx.action === "delete");
+  const single = isDel || ctx.action === "add";   /* 没有左列可比：整列「—」没有信息量 */
+
+  $("#confirmTitle").textContent = meta.title;
+
+  let h = buildCmpHtml({
+    badge: meta.badge,
+    idText: (ctx.id != null ? "定时器ID " + ctx.id : ""),
+    leftHead: meta.leftHead, rightHead: meta.rightHead,
+    single: single,
+    fields: (ctx.action === "toggle") ? TOGGLE_FIELDS : CMP_FIELDS,
+    left: ctx.left, right: ctx.right
+  });
+
+  /* 「编辑」再分两档：编辑一条「已执行」的单次执行 = 重新排期（状态要复位）。
+     判据取自左列快照自身的 timerStatus —— 与配置弹窗的 state.reschedule 同源
+     （都是「编辑对象是不是已执行」），不再另立一个字段。 */
+  const reschedule = (ctx.action === "edit")
+    && !!(ctx.left && ctx.left.timerStatus === "executed");
+
+  h += isDel
+    ? '<div class="alert alert--danger"><b>删除后不可恢复。</b>'
+      + '该定时器会立即从列表中移除，如需保留请改用「编辑」。</div>'
+    : (ctx.action === "add"
+        ? '<div class="alert">确认后该定时器立即生效，触发时会同步更新所有 DS 局共享的全局数值数据。</div>'
+      : (ctx.action === "toggle"
+          ? (ctx.right.timerStatus === "enabled"
+              ? '<div class="alert">确认后该定时器<b>立即恢复运行</b>，到点照常触发。</div>'
+              : '<div class="alert alert--warn">确认后该定时器<b>立即停止触发</b>；'
+                + '配置本身仍然保留，随时可以再启用。</div>')
+          : (reschedule
+              ? '<div class="alert">该定时器已执行完成。确认后回到「待执行」，到点会再执行一次。</div>'
+              : '<div class="alert">确认后<b>立即覆盖线上配置</b>，触发时会同步更新所有 DS 局共享的全局数值数据。</div>')));
+
+  $("#confirmBody").innerHTML = h;
+
+  const ok = $("#btnConfirmOk");
+  ok.textContent = meta.btn;
+  ok.className = isDel ? "fb-btn fb-btn--danger" : "fb-btn fb-btn--primary";
+}
+
+/* 打开确认弹窗。新增 / 修改时叠加在配置弹窗之上（.mask--top），
+   取消时只关这一层，下面的编辑内容原样保留 —— 不必给 openModal 加「不重置表单」的分支；
+   删除 / 启停是从列表直接打开的，下面本来就没有另一层。 */
+function openConfirm(action, id, left, right){
+  confirmCtx = { action: action, id: id, left: left || null, right: clone(right) };
+  renderConfirm();
+  $("#maskConfirm").hidden = false;
+}
+
+function closeConfirm(){
+  $("#maskConfirm").hidden = true;
+  confirmCtx = null;
+}
+
+/* 主按钮分派：动作到写入点的唯一一跳（四个动作各有自己的写入点，互不共用） */
+function confirmOk(){
+  const ctx = confirmCtx;
+  if (!ctx) { closeConfirm(); return; }
+  if (ctx.action === "delete")      commitDelete();
+  else if (ctx.action === "toggle") commitToggle();
+  else                              commitSave();   /* add / edit 共用 */
+}
+
+/* ==========================================================================
+   10b-2. 操作详情（只读）
+   —— 从操作记录弹窗内逐行打开，展示该次动作的配置前后对比。
+   与「生效前确认」**共用 buildCmpHtml**，所以列数与差异高亮口径完全一致。
+   差别只有三点：① 只读，底部只有「关闭」；② 没有底部那句动作提示；
+   ③ 表头用"过去时"（变更前 / 变更后）—— 这里讲的是已经发生的事实。
+   ========================================================================== */
+const LOG_VIEW_HEADS = {
+  add    : { single:true,  leftHead:"",      rightHead:"新增的配置"   },
+  edit   : { single:false, leftHead:"变更前", rightHead:"变更后"      },
+  delete : { single:true,  leftHead:"",      rightHead:"删除前的配置" },
+  /* 启停拆成两条（与 LOG_ACTION 对齐），但对比表长得一样：都只有「定时器状态」1 行。
+     toggle 标记既决定字段清单，也说明这是「运行态变更」而不是「配置变更」。 */
+  enable : { single:false, leftHead:"变更前", rightHead:"变更后", toggle:true },
+  disable: { single:false, leftHead:"变更前", rightHead:"变更后", toggle:true }
+};
+
+function fillLogView(entry){
+  const meta  = LOG_ACTION[entry.action] || { label:"—", cls:"badge-gray" };
+  const heads = LOG_VIEW_HEADS[entry.action] || LOG_VIEW_HEADS.edit;
+
+  /* 左右两列：新增只有「新增后的配置」、删除只有「删除前的配置」，修改 / 启停两者都有。
+     删除场景的右列就是那份被删掉的配置 —— 与确认弹窗里删除场景同构。 */
+  const left  = heads.single ? null : entry.before;
+  const right = heads.single ? (entry.action === "add" ? entry.after : entry.before)
+                             : entry.after;
+
+  /* 兜底：快照缺失的条目不能进渲染 —— cmpVal 会直接读 v.key，传 null 会抛错。 */
+  if (!right || (!heads.single && !left)) {
+    $("#logViewBody").innerHTML =
+      '<div class="alert">这条记录没有留下配置快照，无法展示对比。</div>';
+    return;
+  }
+
+  $("#logViewBody").innerHTML = buildCmpHtml({
+    badge: meta,
+    idText: (entry.recId == null ? "" : "定时器ID " + entry.recId),
+    leftHead: heads.leftHead, rightHead: heads.rightHead,
+    single: heads.single,
+    fields: heads.toggle ? TOGGLE_FIELDS : CMP_FIELDS,
+    left: left, right: right
+  });
+}
+
+function openLogView(entry){
+  if (!entry) return;
+  fillLogView(entry);
+  $("#maskLogView").hidden = false;
+}
+function closeLogView(){ $("#maskLogView").hidden = true; }
+
+/* ==========================================================================
+   11. 演示数据与演示动作
+   ========================================================================== */
+function mk(o){
+  const base = {
+    key: "", value: "",
+    freq: "cycle",
+    cycle   : { granularity:"daily", weekdays:[], monthDays:[], yearMonth:null, yearDay:null, hour:0, minute:0 },
+    once    : { date:"", hour:null, minute:null },
+    dateRange: { start:"2026-09-01", end:"2026-12-31" },
+    timerStatus: "enabled"
+  };
+  return Object.assign(base, o);
+}
+const DEMO = [
+  /* 1) 按周期 · 每天 03:00 · 启用 */
+  mk({
+    key:"daily_gift_switch", value:"1",
+    cycle:{ granularity:"daily", weekdays:[], monthDays:[], yearMonth:null, yearDay:null, hour:3, minute:0 }
+  }),
+
+  /* 2) 按周期 · 每周 周一、周三 05:00 · **禁用**
+     禁用态不是随便加的：操作记录里有一条「禁用定时器「weekly_rank_reward」」，
+     那条日志的「变更后」必须等于这里的当前状态，否则点开查看详情会与列表打架。 */
+  mk({
+    key:"weekly_rank_reward", value:"100",
+    cycle:{ granularity:"weekly", weekdays:[1,3], monthDays:[], yearMonth:null, yearDay:null, hour:5, minute:0 },
+    dateRange:{ start:"2026-09-01", end:"2027-01-31" },
+    timerStatus:"disabled"
+  }),
+
+  /* 3) 按周期 · 每周 周二、周四 09:30 · 启用 */
+  mk({
+    key:"spring_event_switch", value:"0",
+    cycle:{ granularity:"weekly", weekdays:[2,4], monthDays:[], yearMonth:null, yearDay:null, hour:9, minute:30 },
+    dateRange:{ start:"2026-10-01", end:"2026-12-31" }
+  }),
+
+  /* 4) 按周期 · 每月 1日、15日 05:00 · 启用 · 两位小数 Value */
+  mk({
+    key:"monthly_settle", value:"0.01",
+    cycle:{ granularity:"monthly", weekdays:[], monthDays:[1,15], yearMonth:null, yearDay:null, hour:5, minute:0 },
+    dateRange:{ start:"2026-09-01", end:"2027-08-31" }
+  }),
+
+  /* 5) 按周期 · 每月 28日、31日 18:00 · 启用（含「该月无此日自动跳过」的长提示） */
+  mk({
+    key:"month_end_report", value:"5",
+    cycle:{ granularity:"monthly", weekdays:[], monthDays:[28,31], yearMonth:null, yearDay:null, hour:18, minute:0 },
+    dateRange:{ start:"2026-09-01", end:"2026-12-31" }
+  }),
+
+  /* 6) 按周期 · 每年 3月1日 05:00 · 禁用 · 负数 Value */
+  mk({
+    key:"yearly_anniversary", value:"-12.5",
+    cycle:{ granularity:"yearly", weekdays:[], monthDays:[], yearMonth:3, yearDay:1, hour:5, minute:0 },
+    dateRange:{ start:"2026-01-01", end:"2030-12-31" },
+    timerStatus:"disabled"
+  }),
+
+  /* 7) 按周期 · 每年 12月31日 23:59 · 禁用（时间边界 + 禁用态） */
+  mk({
+    key:"year_end_settle", value:"8",
+    cycle:{ granularity:"yearly", weekdays:[], monthDays:[], yearMonth:12, yearDay:31, hour:23, minute:59 },
+    dateRange:{ start:"2026-01-01", end:"2030-12-31" },
+    timerStatus:"disabled"
+  }),
+
+  /* 8) 按周期 · 每天 01:30 · 启用 · 区间留空（始终生效） */
+  mk({
+    key:"heartbeat_ping", value:"7",
+    cycle:{ granularity:"daily", weekdays:[], monthDays:[], yearMonth:null, yearDay:null, hour:1, minute:30 },
+    dateRange:{ start:"", end:"" }
+  }),
+
+  /* 9) 按周期 · 每天 12:30 · 禁用（点状态并在确认弹窗里确认即可切回启用，便于现场演示启停） */
+  mk({
+    key:"old_daily_reset", value:"999",
+    cycle:{ granularity:"daily", weekdays:[], monthDays:[], yearMonth:null, yearDay:null, hour:12, minute:30 },
+    dateRange:{ start:"2026-06-01", end:"2026-12-31" },
+    timerStatus:"disabled"
+  }),
+
+  /* 10) 单次执行 · 已执行（橙色终态；点编辑可重新排期） */
+  mk({
+    key:"autumn_event_once", value:"1", freq:"once",
+    once:{ date:"2026-09-10", hour:5, minute:0 },
+    dateRange: null,
+    timerStatus:"executed"
+  }),
+
+  /* 11) 单次执行 · 待执行（未来时刻，到点会真的跑一次并翻成「已执行」） */
+  mk({
+    key:"winter_event_once", value:"2", freq:"once",
+    once:{ date:"2026-12-25", hour:10, minute:0 },
+    dateRange: null
+  }),
+
+  /* 12) 同 Key 的第二条 ★ —— **专为「同一个 Key 允许存在多条」这张能力卡**
+     与第 1) 条同为 daily_gift_switch，靠 ID 区分（1 与 12）；
+     两条用不同的生效区间表达「同一个 Key，两段时间写不同的值」。
+     没有这一条，这项能力就只存在于代码与文档里 —— 评审时点开演示数据看不到它。 */
+  mk({
+    key:"daily_gift_switch", value:"2",
+    cycle:{ granularity:"daily", weekdays:[], monthDays:[], yearMonth:null, yearDay:null, hour:3, minute:0 },
+    dateRange:{ start:"2027-01-01", end:"2027-03-31" }
+  })
+];
+
+/* ---- GM：一键铺满全场景 ----------------------------------------------
+   目标是把「执行频率 × 周期粒度 × 状态样式」的矩阵一次性摊到列表里，
+   方便评审时逐行核对文案与样式。场景统一 gm_ 前缀，重复点击只补缺的场景。
+   ---------------------------------------------------------------------- */
+/* GM 场景行：按 mk() 的默认值成型即可。
+   保存即生效，不存在「待生效态的配置」，所以这里不需要任何额外加工。 */
+const gmRow = o => mk(o);
+
+function buildGmScenarios(){
+  const cyc = (gran, o) => Object.assign(
+    { granularity:gran, weekdays:[], monthDays:[], yearMonth:null, yearDay:null, hour:0, minute:0 }, o || {});
+
+  return [
+    /* ---- 按周期 · 每天：时间边界 00:00 / 23:59、负小数 Value、区间留空 ---- */
+    gmRow({ key:"gm_daily_zero_hour",  value:"0",
+      cycle:cyc("daily",{hour:0,minute:0}),  dateRange:{ start:"", end:"" } }),
+    gmRow({ key:"gm_daily_last_min",   value:"-999999.99",
+      cycle:cyc("daily",{hour:23,minute:59}), timerStatus:"disabled" }),
+
+    /* ---- 按周期 · 每周：单个星期 / 7 天全选（长文案） ---- */
+    gmRow({ key:"gm_weekly_single",    value:"1",
+      cycle:cyc("weekly",{weekdays:[7],hour:8,minute:0}) }),
+    gmRow({ key:"gm_weekly_all_days",  value:"7",
+      cycle:cyc("weekly",{weekdays:[1,2,3,4,5,6,7],hour:9,minute:30}) }),
+
+    /* ---- 按周期 · 每月：含 31 日（该月无此日自动跳过）/ 多值顿号 ---- */
+    gmRow({ key:"gm_monthly_day31",    value:"3",
+      cycle:cyc("monthly",{monthDays:[1,31],hour:10,minute:0}) }),
+    gmRow({ key:"gm_monthly_multi",    value:"4",
+      cycle:cyc("monthly",{monthDays:[5,10,15,20,25],hour:12,minute:0}) }),
+
+    /* ---- 按周期 · 每年：2 月 29 日（非闰年跳过）/ 年末 23:59 ---- */
+    gmRow({ key:"gm_yearly_leap_day",  value:"5",
+      cycle:cyc("yearly",{yearMonth:2,yearDay:29,hour:6,minute:0}) }),
+    gmRow({ key:"gm_yearly_year_end",  value:"6",
+      cycle:cyc("yearly",{yearMonth:12,yearDay:31,hour:23,minute:59}), timerStatus:"disabled" }),
+
+    /* ---- 单次执行两种状态：待执行 / 已执行 ---- */
+    gmRow({ key:"gm_once_pending",  value:"10", freq:"once",
+      once:{ date:"2027-01-01", hour:0, minute:0 }, dateRange:null }),
+    gmRow({ key:"gm_once_executed", value:"11", freq:"once",
+      once:{ date:"2026-01-01", hour:0, minute:0 }, dateRange:null,
+      timerStatus:"executed" }),
+
+    /* ---- 启停两态：列表上这一列是可点的（点一下就能验证日志落笔） ---- */
+    gmRow({ key:"gm_toggle_enabled",  value:"13",
+      cycle:cyc("daily",{hour:2,minute:0}) }),
+    gmRow({ key:"gm_toggle_disabled", value:"14",
+      cycle:cyc("daily",{hour:3,minute:0}), timerStatus:"disabled" }),
+
+    /* ---- 布局压力：超长 Key（列宽 / 折行 / title 悬浮） ---- */
+    gmRow({ key:"gm_extremely_long_key_for_column_layout_stress_test", value:"16",
+      cycle:cyc("daily",{hour:5,minute:0}) })
+  ];
+}
+
+function demoGm(){
+  CLOCK_OFFSET = 0;                 /* 重置模拟时间，否则快进过的演示无法复原 */
+  /* 幂等：同一个场景不铺第二遍。这里的 Set 装的是**场景定义里的 key** ——
+     GM 场景是代码里写死的清单，key 在那里充当场景名；它不依赖「用户填的 Key 唯一」，
+     所以 Key 放开唯一性之后这条依旧成立。 */
+  const exist  = new Set(state.list.map(r => r.key));
+  const all    = buildGmScenarios();
+  const add    = all.filter(r => !exist.has(r.key));
+  const skip   = all.length - add.length;
+
+  if (!add.length) {
+    toast("覆盖场景已全部存在，未重复添加", "success");
+    return;
+  }
+
+  const now = Date.now();
+  add.forEach((r, i) => {
+    r.id = state.nextId++;
+    r.createdAt = now + i;
+    state.list.push(r);
+  });
+  confirmCtx = null;   /* 整批追加后语境已变，把可能悬挂的确认上下文作废 */
+  resetListFilter();
+  renderTable();
+  toast("已追加 " + add.length + " 条覆盖场景" + (skip ? "（跳过 " + skip + " 条已存在）" : ""), "success");
+}
+
+/* 演示用操作记录：共 8 条，覆盖 add / edit / delete / enable / disable 五类动作
+   （add / edit / delete 各 2 条，enable / disable 各 1 条 —— 启停拆成两枚徽标后，
+   两个方向都要有样本，否则评审时点不出来）。
+   其中 5 个 Key 故意不在 DEMO 列表里 —— 用来现场证明
+   「定时器被删了，操作记录还在」（这正是只做全局入口、日志存快照的硬理由）。
+
+   recId = 被操作定时器的 ID。那 5 条孤儿条目（定时器早已被删除，列表里已经查不到）用的是 13–17 ——
+   比当前列表的 1–12 大。自增 ID 讲的故事是：现在这 12 条先建（拿到 1–12），
+   后来又建的 5 条（13–17）全删掉了，于是它们只剩日志、不见于列表。
+   demoLoad 会把 nextId 拨到所有这些 ID 之后（见那里的注释），否则新建的记录会拿到
+   一个日志里已经出现过的 ID，唯一标识当场重号。
+
+   每条都带 before / after 配置快照，「查看详情」靠它重建那次动作的对比表。
+   其中三条「定时器还在列表里」的条目（recId 1 / 2 / 8）的 after 必须与该记录的
+   **当前状态**完全一致 —— 否则点开查看详情会说"变更后是 X"、列表上却是 Y，
+   自己跟自己矛盾。wb2-dom 有一条断言专门盯着这个自洽性。 */
+function demoLogs(){
+  const t0 = Date.now(), m = 60000;
+  /* 快照的紧凑写法：mk() 补全默认字段 → cmpSnapshot() 抽出对比表要用的那几个。
+     与三个写入点产出的 before / after 是同一形状，因此两边渲染完全一致。 */
+  const sn  = o => cmpSnapshot(mk(o));
+  const cyc = o => Object.assign(
+    { granularity:"daily", weekdays:[], monthDays:[], yearMonth:null, yearDay:null, hour:0, minute:0 }, o || {});
+
+  /* [几分钟前, 动作, recId, before, after] */
+  const raw = [
+    [8,  "add",     13,
+      null,
+      sn({ key:"summer_island_boss_hp", value:"5000", cycle: cyc({ hour:4 }),
+           dateRange:{ start:"2026-07-01", end:"2026-08-31" } })],
+
+    [7,  "edit",    14,
+      sn({ key:"summer_island_drop_rate", value:"0.05", cycle: cyc({ hour:4 }),
+           dateRange:{ start:"2026-07-01", end:"2026-08-31" } }),
+      sn({ key:"summer_island_drop_rate", value:"0.08", cycle: cyc({ hour:4 }),
+           dateRange:{ start:"2026-07-01", end:"2026-08-31" } })],
+
+    [6,  "disable",  2,
+      sn({ key:"weekly_rank_reward", value:"100",
+           cycle: cyc({ granularity:"weekly", weekdays:[1,3], hour:5 }),
+           dateRange:{ start:"2026-09-01", end:"2027-01-31" }, timerStatus:"enabled" }),
+      sn({ key:"weekly_rank_reward", value:"100",
+           cycle: cyc({ granularity:"weekly", weekdays:[1,3], hour:5 }),
+           dateRange:{ start:"2026-09-01", end:"2027-01-31" }, timerStatus:"disabled" })],
+
+    [5,  "delete",  15,
+      sn({ key:"summer_island_old_event", value:"1",
+           cycle: cyc({ granularity:"yearly", yearMonth:7, yearDay:15 }),
+           dateRange:{ start:"2026-07-01", end:"2026-08-31" } }),
+      null],
+
+    [4,  "add",     16,
+      null,
+      sn({ key:"summer_island_login_gift", value:"3", cycle: cyc({ hour:0 }),
+           dateRange:{ start:"2026-07-01", end:"2026-08-31" } })],
+
+    [3,  "enable",   8,
+      sn({ key:"heartbeat_ping", value:"7", cycle: cyc({ hour:1, minute:30 }),
+           dateRange:{ start:"", end:"" }, timerStatus:"disabled" }),
+      sn({ key:"heartbeat_ping", value:"7", cycle: cyc({ hour:1, minute:30 }),
+           dateRange:{ start:"", end:"" }, timerStatus:"enabled" })],
+
+    [2,  "edit",     1,
+      sn({ key:"daily_gift_switch", value:"0", cycle: cyc({ hour:3 }),
+           dateRange:{ start:"2026-09-01", end:"2026-12-31" } }),
+      sn({ key:"daily_gift_switch", value:"1", cycle: cyc({ hour:3 }),
+           dateRange:{ start:"2026-09-01", end:"2026-12-31" } })],
+
+    [1,  "delete",  17,
+      sn({ key:"summer_island_removed_key", value:"9",
+           cycle: cyc({ granularity:"monthly", monthDays:[1], hour:9 }),
+           dateRange:{ start:"2026-07-01", end:"2026-08-31" } }),
+      null]
+  ];
+  return raw.map(x => ({
+    id: ++logSeq, ts: t0 - x[0] * m, actor: OPERATOR,
+    action: x[1], recId: x[2],
+    before: x[3] || null, after: x[4] || null
+  }));
+}
+
+function demoLoad(){
+  CLOCK_OFFSET = 0;                 /* 重置模拟时间，否则快进过的演示无法复原 */
+  const now = Date.now();
+  state.list = DEMO.map((d, i) => Object.assign(clone(d), { id: i + 1, createdAt: now - i * 60000 }));
+
+  state.logs  = demoLogs();
+  /* nextId 要拨到「列表现有 ID」与「日志里出现过的所有 recId」之后。
+     演示日志里有 5 条已被删除的历史条目（recId 13–17），它们比列表的 1–12 大 ——
+     若 nextId 只取 DEMO.length+1，新建的第一条记录会拿到 13，与日志里那条历史条目重号，
+     ID 作为唯一标识当场失效。 */
+  state.nextId = state.logs.reduce((m, l) => Math.max(m, (l.recId || 0) + 1), DEMO.length + 1);
+
+  confirmCtx  = null;               /* 演示数据整体替换了语境 */
+  resetListFilter();
+  renderTable();
+  toast("已载入 " + DEMO.length + " 条演示数据", "success");
+}
+
+function demoClear(){
+  CLOCK_OFFSET = 0;
+  state.list = [];
+  state.nextId = 1;
+  state.logs = [];                  /* 清空列表时日志一并清掉，否则会留下查不到对象的孤儿条目 */
+  logSeq = 0;
+  confirmCtx = null;
+  resetListFilter();
+  renderTable();
+  toast("已清空列表", "success");
+}
+
+/* ---- GM：模拟时间快进（用于演示「待执行 → 到点执行」） ---- */
+function advanceClock(days){
+  CLOCK_OFFSET += days * 86400000;
+  scanOnce();
+  renderTable();
+}
+function demoFastForward(){
+  advanceClock(1);
+  toast("已把模拟时间快进 1 天", "success");
+}
+
+/* ==========================================================================
+   12. 事件与初始化
+   ========================================================================== */
+
+/* ---- 顶部按钮 ---- */
+$("#btnAdd").addEventListener("click", () => openModal(null));
+
+/* ---- 操作记录弹窗（入口按钮无计数、不置灰：日志是查看器，不是待办队列） ---- */
+$("#btnLog").addEventListener("click", openLog);
+
+/* ---- 列表筛选：静态控件 → 每次改动重绘表格。
+        搜索走 input（边打边筛）；两个下拉走 change；重置一键清空三项。 ---- */
+$("#fKeySearch").addEventListener("input", renderTable);
+$("#fFreq").addEventListener("change", renderTable);
+$("#fStatus").addEventListener("change", renderTable);
+$("#fReset").addEventListener("click", () => { resetListFilter(); renderTable(); });
+$("#maskLog").addEventListener("click", e => {
+  if (e.target.closest("[data-close-log]")) closeLog();
+});
+$("#maskLog").addEventListener("mousedown", e => { if (e.target === $("#maskLog")) closeLog(); });
+$("#logAction").addEventListener("change", renderLog);   /* 操作类型：切换即筛 */
+
+/* ---- 操作详情（只读）：操作记录行内的「查看详情」打开 ----
+   按**日志行自身的 id** 反查条目（不是 recId —— recId 指向被操作的定时器，
+   可能早已被删，指不回日志上）。用委托是因为日志行每次重绘都是新节点。 */
+$("#logRegion").addEventListener("click", e => {
+  const btn = e.target.closest("[data-log-id]");
+  if (!btn) return;
+  openLogView(state.logs.find(x => x.id === Number(btn.dataset.logId)));
+});
+$("#maskLogView").addEventListener("click", e => {
+  if (e.target.closest("[data-close-logview]")) closeLogView();
+});
+$("#maskLogView").addEventListener("mousedown", e => {
+  if (e.target === $("#maskLogView")) closeLogView();
+});
+
+/* ---- 演示入口（一键铺覆盖场景 / 载入 / 清空 / 快进模拟时间） ---- */
+$("#demoGm").addEventListener("click", demoGm);
+$("#demoLoad").addEventListener("click", demoLoad);
+$("#demoClear").addEventListener("click", demoClear);
+$("#demoFastForward").addEventListener("click", demoFastForward);
+
+/* ---- 列表事件（委托）----
+   edit → 打开配置弹窗（保存时再确认）；del / toggle → 直接开确认弹窗 */
+$("#tableRegion").addEventListener("click", e => {
+  const btn = e.target.closest("[data-act]");
+  if (!btn) return;
+  const id = Number(btn.dataset.id);
+  const act = btn.dataset.act;
+  if (act === "edit")         openModal(id);
+  else if (act === "del")     deleteTimer(id);
+  else if (act === "toggle")  toggleTimer(id);
+});
+
+/* ---- 「定时器状态」列头 ⓘ 的悬浮说明 ----
+   气泡是 body 下的 fixed 元素（见 4.5b），位置由 ⓘ 的矩形现算。
+   离场判断必须看 relatedTarget 是否仍落在 ⓘ 内：mouseover / mouseout 会在
+   ⓘ 与它的 svg 子节点之间反复触发，不判 relatedTarget 就会一闪一闪。 */
+const thTip = $("#thStatusTip");
+let thTipAnchor = null;      /* 气泡当前挂靠的 ⓘ —— 缩放时要拿它重新摆位，滚动则直接收起 */
+
+function placeThTip(btn){
+  const r = btn.getBoundingClientRect(), w = thTip.offsetWidth;
+  let left = r.left + r.width / 2 - w / 2;
+  left = Math.max(12, Math.min(left, window.innerWidth - w - 12));   /* 贴边时收回可视区 */
+  thTip.style.left = left + "px";
+  thTip.style.top  = (r.bottom + 8) + "px";
+}
+function showThTip(btn){
+  thTipAnchor = btn;
+  thTip.hidden = false;                        /* 先显示，才量得到 width */
+  placeThTip(btn);
+}
+function hideThTip(){ thTip.hidden = true; thTipAnchor = null; }
+const tipHost = e => (e.target && e.target.closest) ? e.target.closest(".th-info") : null;
+
+$("#tableRegion").addEventListener("mouseover", e => {
+  const b = tipHost(e);
+  if (b && !b.contains(e.relatedTarget)) showThTip(b);
+});
+$("#tableRegion").addEventListener("mouseout", e => {
+  const b = tipHost(e);
+  if (b && !b.contains(e.relatedTarget)) hideThTip();
+});
+$("#tableRegion").addEventListener("focusin",  e => { const b = tipHost(e); if (b) showThTip(b); });
+$("#tableRegion").addEventListener("focusout", e => { const b = tipHost(e); if (b) hideThTip(); });
+/* 缩放：重新摆位 —— 气泡是 fixed，不重摆就会与 ⓘ 脱节；ⓘ 已被重绘掉则干脆收起。
+   滚动（含表格自身的横向滚动）：直接收起，下次悬停再定位。 */
+window.addEventListener("resize", () => {
+  if (!thTip.hidden && thTipAnchor && thTipAnchor.isConnected) placeThTip(thTipAnchor);
+  else hideThTip();
+});
+window.addEventListener("scroll", hideThTip, true);
+
+/* ---- 生效前确认弹窗（新增 / 修改 / 删除共用）----
+   取消 / 点 ✕ / 点遮罩：只关这一层，回到下面的配置弹窗继续改；关掉后补一次重绘 */
+$("#maskConfirm").addEventListener("click", e => {
+  if (e.target.closest("[data-close-confirm]")) { closeConfirm(); renderTable(); }
+});
+$("#maskConfirm").addEventListener("mousedown", e => {
+  if (e.target === $("#maskConfirm")) { closeConfirm(); renderTable(); }
+});
+$("#btnConfirmOk").addEventListener("click", confirmOk);
+
+/* ---- 弹窗：点击（频率 / 粒度 / 多选标签 / 关闭） ---- */
+$("#modal").addEventListener("click", e => {
+  /* 这里不处理状态：状态不在配置弹窗里改，唯一入口是列表上的状态开关（见上方 HTML 注释） */
+  const t = e.target.closest("[data-freq],[data-gran],[data-tag],[data-close]");
+  if (!t) return;
+
+  if (t.hasAttribute("data-close")) { closeModal(); return; }
+
+  if (t.dataset.freq) {
+    syncFormFromDOM();
+    state.form.freq = t.dataset.freq;
+    dropErr(["cycleWeek","cycleMonth","cycleYear","time","onceDate","range"]);
+    setFreqSeg();
+    renderDynamicArea();
+    applyErrors();
+    renderPreview();
+    return;
+  }
+
+  if (t.dataset.gran) {
+    syncFormFromDOM();
+    state.form.cycle.granularity = t.dataset.gran;
+    /* 粒度切换：清掉其他粒度的错误，保留已填的值 */
+    dropErr(["cycleWeek","cycleMonth","cycleYear","time"]);
+    renderDynamicArea();
+    applyErrors();
+    renderPreview();
+    return;
+  }
+
+  if (t.dataset.tag) {
+    syncFormFromDOM();
+    const group = t.dataset.tag;
+    const v = Number(t.dataset.val);
+    let arr, errKey;
+    if (group === "week")  { arr = state.form.cycle.weekdays;  errKey = "cycleWeek"; }
+    else                   { arr = state.form.cycle.monthDays; errKey = "cycleMonth"; }
+
+    const i = arr.indexOf(v);
+    if (i >= 0) arr.splice(i, 1); else arr.push(v);
+
+    if (errKey) clearErr(errKey);
+    renderDynamicArea();   /* 标签选中态随状态重绘 */
+    applyErrors();
+    renderPreview();
+  }
+});
+
+/* ---- 弹窗：输入 ---- */
+/* 文本 / 数字 / 日期控件的统一处理：只刷新预览文案，不重绘 DOM，避免输入丢焦点 */
+function handleFieldInput(el){
+  const f = state.form;
+  if (!f) return;
+
+  /* radio 不归这里管：它由下面的 change 委托处理。
+     原因是 radio 的 input 事件先于 change 到达，那一刻 state.form.rangeMode 还是旧值，
+     照旧值渲染会把用户刚展开的日期框又收回去（键盘方向键切换尤其明显）。 */
+  if (el.type === "radio") return;
+
+  /* Value：非法字符**不再回退** —— 回退会让「输入框变红」永远看不到，用户只会觉得打不进去。
+     实时口径用宽松正则，放行 `-` / `-.` / `1.` 这类输入中间态；命不中的字符就地标红，
+     改回合法后立即恢复。提交时另用严格正则兜底（见 validate），异常一律阻拦。 */
+  if (el.id === "in-value") {
+    f.value = el.value;
+    if (el.value === "" || /^-?\d*\.?\d{0,2}$/.test(el.value)) clearErr("value");
+    else setFieldErr("value", "Value仅允许数字（支持负数、小数点）");
+    renderPreview();
+    return;
+  }
+
+  if (el.id === "in-key")      { f.key = el.value; clearErr("key"); }
+  if (el.id === "in-rstart")   { f.dateRange.start = el.value; clearErr("range"); }
+  if (el.id === "in-rend")     { f.dateRange.end   = el.value; clearErr("range"); }
+  if (el.id === "in-oncedate") { f.once.date = el.value; clearErr("onceDate"); }
+
+  renderPreview();
+}
+
+$("#modal").addEventListener("input", e => handleFieldInput(e.target));
+
+/* ---- 弹窗：下拉 / 日期 / 单选项 ---- */
+$("#modal").addEventListener("change", e => {
+  const el = e.target;
+
+  /* 生效区间的单选项。切到「始终生效」时把两个日期**当场清空**，
+     于是「日期为空 ⟺ 始终生效」恒成立，记录侧不需要再存一个模式字段。
+     清空发生在切走的那一刻而不是保存时：用户看得见，也不会有「看不见的值被偷偷提交」。 */
+  if (el.name === "rangeMode") {
+    const f = state.form;
+    if (!f) return;
+    f.rangeMode = el.value;
+    if (el.value === "always") {
+      f.dateRange.start = "";
+      f.dateRange.end   = "";
+      const s = $("#in-rstart"), en = $("#in-rend");
+      if (s)  s.value  = "";
+      if (en) en.value = "";
+    }
+    syncRangePicker();
+    clearErr("range");
+    renderPreview();
+    return;
+  }
+
+  if (el.tagName !== "SELECT") { handleFieldInput(el); return; }   /* 日期控件 */
+
+  syncFormFromDOM();
+  if (el.id === "in-hour" || el.id === "in-min" ||
+      el.id === "in-oncehour" || el.id === "in-oncemin") clearErr("time");
+  if (el.id === "in-ym" || el.id === "in-yd") clearErr("cycleYear");
+  renderPreview();
+});
+
+/* ---- 弹窗：保存 / 遮罩关闭 / ESC ---- */
+$("#btnSave").addEventListener("click", onSave);
+$("#mask").addEventListener("mousedown", e => { if (e.target === $("#mask")) closeModal(); });
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  /* 层级最内层优先：确认弹窗 > 操作记录 > 配置弹窗。
+     取消确认弹窗后补一次重绘 —— 弹窗期间扫描可能已经翻过状态。 */
+  if (!$("#maskLogView").hidden) { closeLogView(); return; }   /* 操作详情最内层 */
+  if (!$("#maskConfirm").hidden) { closeConfirm(); renderTable(); return; }
+  if (!$("#maskLog").hidden)     { closeLog(); return; }
+  if (!$("#mask").hidden) closeModal();
+});
+
+/* ---- 初始化：默认空态 ---- */
+renderTable();
+
+/* 每秒扫一次到点状态；只在真有变化时重绘，避免打断悬停 / 滚动。
+   确认弹窗开着时跳过 —— 它遮住了列表，而重绘会让「定时器状态」这类字段在对比时漂移。 */
+if (!IS_TEST_ENV) setInterval(() => {
+  if (!$("#maskConfirm").hidden) return;
+  if (scanOnce()) renderTable();
+}, 1000);
+</script>
+</body>
+</html>
